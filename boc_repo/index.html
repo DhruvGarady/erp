@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #1f6feb;
+      --primary-dark: #174ea6;
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #d9e2ef;
+      --shadow: 0 20px 45px rgba(31, 41, 55, 0.12);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(31,111,235,.10), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(31,111,235,.08), transparent 24%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .login-shell {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 1080px;
+      background: var(--card);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(217,226,239,.8);
+    }
+
+    .brand-panel {
+      background: linear-gradient(145deg, #0f172a, #1e3a5f 55%, #1f6feb);
+      color: #fff;
+      padding: 56px 44px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+    }
+
+    .brand-badge {
+      width: 58px;
+      height: 58px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .brand-title {
+      font-size: 34px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 14px;
+    }
+
+    .brand-text {
+      font-size: 15px;
+      line-height: 1.75;
+      color: rgba(255,255,255,.84);
+      max-width: 420px;
+      margin-bottom: 28px;
+    }
+
+    .brand-points {
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .brand-points li {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: rgba(255,255,255,.9);
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .brand-points li:before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      left: 0;
+      top: 6px;
+      opacity: .9;
+    }
+
+    .form-panel {
+      padding: 52px 44px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      min-height: 640px;
+    }
+
+    .form-box {
+      width: 100%;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .form-logo {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #111827;
+    }
+
+    .form-subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    .form-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .form-control {
+      height: 48px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      box-shadow: none !important;
+      font-size: 14px;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary);
+    }
+
+    .btn-login {
+      height: 48px;
+      border-radius: 12px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+      font-size: 15px;
+      transition: .2s ease;
+    }
+
+    .btn-login:hover {
+      background: var(--primary-dark);
+      color: #fff;
+    }
+
+    .helper-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .helper-row a,
+    .signup-link a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .signup-link {
+      text-align: center;
+      margin-top: 18px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .login-alert {
+      display: none;
+      border-radius: 12px;
+      font-size: 13px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+    }
+
+    .footer-note {
+      margin-top: 26px;
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: center;
+    }
+
+    @media (max-width: 991.98px) {
+      .brand-panel {
+        min-height: 280px;
+      }
+      .form-panel {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 575.98px) {
+      .brand-panel,
+      .form-panel {
+        padding: 32px 22px;
+      }
+      .brand-title {
+        font-size: 28px;
+      }
+      .login-shell {
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-wrap container-fluid p-0">
+      <div class="row no-gutters">
+        <div class="col-lg-6 d-none d-lg-block">
+          <div class="brand-panel">
+            <div class="brand-badge">E</div>
+            <div class="brand-title">ERP Platform</div>
+            <div class="brand-text">
+              Manage quotations, inventory, procurement, production, finance, and warehouse operations from one secure workspace.
+            </div>
+            <ul class="brand-points">
+              <li>Quotation to order flow.</li>
+              <li>Material, BOM, and warehouse masters.</li>
+              <li>Journal posting and fiscal control.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="form-panel">
+            <div class="form-box">
+              <div class="form-logo">Welcome back</div>
+              <div class="form-subtitle">Sign in to continue to your ERP dashboard.</div>
+
+              <div id="loginAlert" class="alert login-alert"></div>
+
+              <form id="loginForm" autocomplete="off">
+                <div class="form-group">
+                  <label for="username">Email or Username</label>
+                  <input type="text" class="form-control" id="username" placeholder="Enter your email or username">
+                </div>
+
+                <div class="form-group">
+                  <label for="password">Password</label>
+                  <input type="password" class="form-control" id="password" placeholder="Enter your password">
+                </div>
+
+                <div class="helper-row">
+                  <div class="custom-control custom-checkbox">
+                    <input type="checkbox" class="custom-control-input" id="rememberMe">
+                    <label class="custom-control-label" for="rememberMe">Remember me</label>
+                  </div>
+                  <a href="signup.html">Create account</a>
+                </div>
+
+                <button type="submit" class="btn btn-login btn-block" id="btnLogin">Sign In</button>
+              </form>
+
+              <div class="signup-link">
+                New user? <a href="signup.html">Sign up with email</a>
+              </div>
+
+              <div class="footer-note">
+                Secure access with JWT authentication.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var request_url = window.request_url || 'http://localhost:3000';
+
+    function showInlineMessage(type, message) {
+      var $box = $('#loginAlert');
+      $box.removeClass('alert-danger alert-success').addClass(type === 'success' ? 'alert-success' : 'alert-danger');
+      $box.html(message).fadeIn(150);
+    }
+
+    function saveAuth(response) {
+      var user = response.user || response;
+
+      if (response.token) {
+        sessionStorage.setItem('TOKEN', response.token);
+      }
+      if (user.user_id) {
+        sessionStorage.setItem('USER_ID', user.user_id);
+      }
+      if (user.username) {
+        sessionStorage.setItem('USERNAME', user.username);
+      }
+      if (user.full_name) {
+        sessionStorage.setItem('FULL_NAME', user.full_name);
+      }
+      if (user.email) {
+        sessionStorage.setItem('EMAIL', user.email);
+      }
+      if (user.profile_picture) {
+        sessionStorage.setItem('PROFILE_PICTURE', user.profile_picture);
+      }
+      if (user.role_name) {
+        sessionStorage.setItem('ROLE_NAME', user.role_name);
+      }
+    }
+
+    function loginUser() {
+      var username = $.trim($('#username').val());
+      var password = $('#password').val();
+
+      if (!username) {
+        showInlineMessage('error', 'Please enter your email or username.');
+        $('#username').focus();
+        return;
+      }
+
+      if (!password) {
+        showInlineMessage('error', 'Please enter your password.');
+        $('#password').focus();
+        return;
+      }
+
+      $('#btnLogin').prop('disabled', true).text('Signing In...');
+      $('#loginAlert').hide();
+
+      $.ajax({
+        type: 'POST',
+        url: request_url + '/auth/login',
+        data: JSON.stringify({
+          username: username,
+          password: password
+        }),
+        contentType: 'application/json',
+        success: function(response) {
+          saveAuth(response);
+          showInlineMessage('success', 'Login successful. Redirecting...');
+          setTimeout(function() {
+            window.location.href = '_webpages/home.html';
+          }, 500);
+        },
+        error: function(xhr) {
+          var message = 'Invalid username or password.';
+          if (xhr.responseJSON && xhr.responseJSON.error) {
+            message = xhr.responseJSON.error;
+          }
+          showInlineMessage('error', message);
+        },
+        complete: function() {
+          $('#btnLogin').prop('disabled', false).text('Sign In');
+        }
+      });
+    }
+
+    $(function() {
+      var token = sessionStorage.getItem('TOKEN');
+      var userId = sessionStorage.getItem('USER_ID');
+
+      if (token && userId) {
+        window.location.href = '_webpages/home.html';
+        return;
+      }
+
+      $('#loginForm').on('submit', function(e) {
+        e.preventDefault();
+        loginUser();
+      });
+    });
+  </script>
+</body>
+</html>

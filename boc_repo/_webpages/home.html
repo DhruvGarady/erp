@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    :root {
+      --sidebar: #111827;
+      --sidebar-soft: #1f2937;
+      --primary: #1f6feb;
+      --bg: #f5f7fb;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5eaf2;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 268px;
+      min-height: 100vh;
+      background: var(--sidebar);
+      color: #fff;
+      position: sticky;
+      top: 0;
+      transition: width .22s ease, transform .22s ease;
+      flex-shrink: 0;
+    }
+
+    .sidebar.collapsed {
+      width: 78px;
+    }
+
+    .brand-row {
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+
+    .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .brand-name {
+      font-size: 17px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .sidebar-toggle {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 8px;
+      color: #fff;
+      background: rgba(255,255,255,.08);
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .nav-wrap {
+      padding: 14px 10px 24px;
+    }
+
+    .nav-group {
+      margin-bottom: 14px;
+    }
+
+    .nav-title {
+      padding: 10px 12px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.45);
+      white-space: nowrap;
+    }
+
+    .nav-link,
+    .sub-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255,255,255,.82);
+      text-decoration: none;
+      border-radius: 10px;
+      transition: background .18s ease, color .18s ease;
+      white-space: nowrap;
+    }
+
+    .nav-link {
+      min-height: 44px;
+      padding: 10px 12px;
+      font-weight: 600;
+    }
+
+    .sub-link {
+      min-height: 38px;
+      padding: 8px 12px 8px 50px;
+      font-size: 14px;
+      color: rgba(255,255,255,.68);
+    }
+
+    .nav-link:hover,
+    .sub-link:hover,
+    .nav-link.active,
+    .sub-link.active {
+      color: #fff;
+      background: var(--primary);
+      text-decoration: none;
+    }
+
+    .nav-icon {
+      width: 24px;
+      min-width: 24px;
+      text-align: center;
+      font-size: 17px;
+    }
+
+    .sidebar.collapsed .brand-name,
+    .sidebar.collapsed .nav-title,
+    .sidebar.collapsed .nav-text,
+    .sidebar.collapsed .sub-text {
+      display: none;
+    }
+
+    .sidebar.collapsed .brand-row {
+      padding: 0 4px;
+    }
+
+    .sidebar.collapsed .nav-link,
+    .sidebar.collapsed .sub-link {
+      justify-content: center;
+      padding: 10px 0;
+      gap: 0;
+    }
+
+    .main-area {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .topbar {
+      height: 68px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .mobile-menu {
+      display: none;
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: #fff;
+      color: var(--text);
+      font-size: 20px;
+      line-height: 1;
+      margin-right: 12px;
+    }
+
+    .page-heading {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .page-heading h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .user-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .user-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #e8f0ff;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .user-name {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .user-role {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
+    }
+
+    .logout-btn {
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: #fff;
+      color: var(--text);
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .content {
+      padding: 24px;
+    }
+
+    .welcome-panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+
+    .welcome-panel h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .welcome-panel p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .quick-card {
+      display: block;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      color: var(--text);
+      text-decoration: none;
+      min-height: 132px;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+
+    .quick-card:hover {
+      color: var(--text);
+      text-decoration: none;
+      transform: translateY(-2px);
+      border-color: #b9cdf0;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, .08);
+    }
+
+    .quick-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #eef4ff;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      margin-bottom: 14px;
+    }
+
+    .quick-card h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .quick-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1100px) {
+      .quick-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 767.98px) {
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 1000;
+        transform: translateX(-100%);
+        width: 268px;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .sidebar.collapsed {
+        width: 268px;
+      }
+
+      .sidebar.collapsed .brand-name,
+      .sidebar.collapsed .nav-title,
+      .sidebar.collapsed .nav-text,
+      .sidebar.collapsed .sub-text,
+      .sidebar.collapsed .sidebar-toggle {
+        display: block;
+      }
+
+      .sidebar.collapsed .nav-link,
+      .sidebar.collapsed .sub-link {
+        justify-content: flex-start;
+        gap: 12px;
+      }
+
+      .sidebar.collapsed .sub-link {
+        padding: 8px 12px 8px 50px;
+      }
+
+      .mobile-menu {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .topbar {
+        padding: 0 16px;
+      }
+
+      .user-meta,
+      .logout-btn {
+        display: none;
+      }
+
+      .content {
+        padding: 16px;
+      }
+
+      .quick-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-row">
+        <div class="brand-mark">
+          <div class="brand-logo">E</div>
+          <div class="brand-name">ERP</div>
+        </div>
+        <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">M</button>
+      </div>
+
+      <nav class="nav-wrap" aria-label="Main menu">
+        <div class="nav-group">
+          <div class="nav-title">Workspace</div>
+          <a href="home.html" class="nav-link active">
+            <span class="nav-icon">H</span>
+            <span class="nav-text">Home</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-title">Master Data</div>
+          <a href="javascript:void(0)" class="nav-link">
+            <span class="nav-icon">M</span>
+            <span class="nav-text">Master Data</span>
+          </a>
+          <a href="../pages/masterdata/customer_inq.html" class="sub-link">
+            <span class="sub-text">Customer</span>
+          </a>
+          <a href="javascript:void(0)" class="sub-link">
+            <span class="sub-text">Vendor</span>
+          </a>
+          <a href="javascript:void(0)" class="sub-link">
+            <span class="sub-text">Material</span>
+          </a>
+          <a href="javascript:void(0)" class="sub-link">
+            <span class="sub-text">Warehouse</span>
+          </a>
+          <a href="javascript:void(0)" class="sub-link">
+            <span class="sub-text">GL Account</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-title">Transactions</div>
+          <a href="javascript:void(0)" class="nav-link">
+            <span class="nav-icon">J</span>
+            <span class="nav-text">Journals</span>
+          </a>
+          <a href="javascript:void(0)" class="nav-link">
+            <span class="nav-icon">Q</span>
+            <span class="nav-text">Quotations</span>
+          </a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-title">Finance</div>
+          <a href="javascript:void(0)" class="nav-link">
+            <span class="nav-icon">T</span>
+            <span class="nav-text">Trial Balance</span>
+          </a>
+          <a href="javascript:void(0)" class="nav-link">
+            <span class="nav-icon">P</span>
+            <span class="nav-text">Fiscal Periods</span>
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="page-heading">
+          <button type="button" class="mobile-menu" id="mobileMenu" aria-label="Open menu">M</button>
+          <h1>Home</h1>
+        </div>
+        <div class="user-box">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <div class="user-meta">
+            <p class="user-name" id="userName">User</p>
+            <p class="user-role" id="userRole">ERP User</p>
+          </div>
+          <button type="button" class="logout-btn" id="logoutBtn">Logout</button>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="welcome-panel">
+          <h2 id="welcomeTitle">Welcome back</h2>
+          <p>Select a module from the sidebar to continue.</p>
+        </div>
+
+        <div class="quick-grid">
+          <a class="quick-card" href="../pages/masterdata/customer_inq.html">
+            <div class="quick-icon">M</div>
+            <h3>Customer Master</h3>
+            <p>Search, review, and maintain customer records.</p>
+          </a>
+          <a class="quick-card" href="javascript:void(0)">
+            <div class="quick-icon">Q</div>
+            <h3>Quotations</h3>
+            <p>Create and track customer quotations.</p>
+          </a>
+          <a class="quick-card" href="javascript:void(0)">
+            <div class="quick-icon">J</div>
+            <h3>Journals</h3>
+            <p>Post accounting entries and reversals.</p>
+          </a>
+          <a class="quick-card" href="javascript:void(0)">
+            <div class="quick-icon">T</div>
+            <h3>Trial Balance</h3>
+            <p>Review debit, credit, and account balances.</p>
+          </a>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function requireLogin() {
+      var token = sessionStorage.getItem('TOKEN');
+      var userId = sessionStorage.getItem('USER_ID');
+
+      if (!token || !userId) {
+        window.location.href = '../index.html';
+        return false;
+      }
+
+      return true;
+    }
+
+    function applyUserInfo() {
+      var fullName = sessionStorage.getItem('FULL_NAME') || sessionStorage.getItem('USERNAME') || 'User';
+      var roleName = sessionStorage.getItem('ROLE_NAME') || 'ERP User';
+      var initials = fullName.replace(/\s+/g, ' ').trim().split(' ').slice(0, 2).map(function(part) {
+        return part.charAt(0).toUpperCase();
+      }).join('') || 'U';
+
+      document.getElementById('userName').textContent = fullName;
+      document.getElementById('userRole').textContent = roleName;
+      document.getElementById('userAvatar').textContent = initials;
+      document.getElementById('welcomeTitle').textContent = 'Welcome back, ' + fullName;
+    }
+
+    function loadSidebarState() {
+      var state = sessionStorage.getItem('HOME_SIDEBAR') || 'FULL';
+      if (state === 'COLLAPSED') {
+        document.getElementById('sidebar').classList.add('collapsed');
+      }
+    }
+
+    function toggleSidebar() {
+      var sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('collapsed');
+      sessionStorage.setItem('HOME_SIDEBAR', sidebar.classList.contains('collapsed') ? 'COLLAPSED' : 'FULL');
+    }
+
+    function toggleMobileMenu() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    function logout() {
+      sessionStorage.clear();
+      localStorage.clear();
+      window.location.href = '../index.html';
+    }
+
+    if (requireLogin()) {
+      applyUserInfo();
+      loadSidebarState();
+
+      document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+      document.getElementById('mobileMenu').addEventListener('click', toggleMobileMenu);
+      document.getElementById('logoutBtn').addEventListener('click', logout);
+    }
+  </script>
+</body>
+</html>

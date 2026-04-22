@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer Inquiry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../../global/libs/jquery/jquery-ui.css">
+
+  <script src="../../global/libs/jquery/jquery.min.js" type="text/javascript"></script>
+  <script src="../../global/libs/bootstrap/bootstrap.min.js" type="text/javascript"></script>
+  <script src="../../global/libs/underscore/underscore.js" type="text/javascript"></script>
+  <script src="../../global/global_exp1.js" type="text/javascript"></script>
+  <script src="../../global/properties.js" type="text/javascript"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+      overflow-x: hidden;
+    }
+
+    .page-shell {
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 260px;
+      min-height: 100vh;
+      background: #111827;
+      color: #fff;
+      transition: width 0.25s ease;
+      position: sticky;
+      top: 0;
+    }
+
+    .sidebar.collapsed {
+      width: 76px;
+    }
+
+    .brand-box {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .sidebar.collapsed .brand-title,
+    .sidebar.collapsed .menu-text,
+    .sidebar.collapsed .menu-sub,
+    .sidebar.collapsed .group-title {
+      display: none;
+    }
+
+    .toggle-btn {
+      background: rgba(255,255,255,.08);
+      border: none;
+      color: #fff;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .nav-section {
+      padding: 14px 10px 24px;
+    }
+
+    .group-title {
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.45);
+      padding: 10px 12px 8px;
+    }
+
+    .menu-link,
+    .submenu-link {
+      display: flex;
+      align-items: center;
+      color: rgba(255,255,255,.88);
+      text-decoration: none;
+      border-radius: 10px;
+      transition: all .2s ease;
+    }
+
+    .menu-link {
+      padding: 12px;
+      margin-bottom: 6px;
+    }
+
+    .submenu-link {
+      padding: 10px 12px 10px 46px;
+      font-size: 14px;
+      margin-bottom: 4px;
+      color: rgba(255,255,255,.72);
+    }
+
+    .sidebar.collapsed .submenu-link {
+      justify-content: center;
+      padding: 10px 0;
+    }
+
+    .menu-link:hover,
+    .submenu-link:hover,
+    .menu-link.active,
+    .submenu-link.active {
+      background: #1f6feb;
+      color: #fff;
+      text-decoration: none;
+    }
+
+    .menu-icon {
+      width: 30px;
+      min-width: 30px;
+      text-align: center;
+      font-size: 18px;
+      margin-right: 12px;
+    }
+
+    .sidebar.collapsed .menu-icon {
+      margin-right: 0;
+    }
+
+    .content-area {
+      padding: 24px;
+      width: calc(100% - 260px);
+      transition: width .25s ease;
+    }
+
+    .content-area.expanded {
+      width: calc(100% - 76px);
+    }
+
+    .page-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
+      border: 1px solid #e6edf5;
+    }
+
+    .page-head {
+      padding: 20px 22px;
+      border-bottom: 1px solid #edf2f7;
+    }
+
+    .page-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .page-subtitle {
+      margin: 6px 0 0;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .toolbar {
+      padding: 18px 22px;
+      border-bottom: 1px solid #edf2f7;
+    }
+
+    .search-box {
+      position: relative;
+    }
+
+    .search-box input {
+      height: 44px;
+      border-radius: 10px;
+      border: 1px solid #d7e0ea;
+      padding-left: 14px;
+    }
+
+    .btn-primary-custom {
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      background: #1f6feb;
+      color: #fff;
+      padding: 0 18px;
+      font-weight: 600;
+    }
+
+    .btn-primary-custom:hover {
+      background: #1859bd;
+      color: #fff;
+    }
+
+    .table-wrap {
+      padding: 0 22px 22px;
+    }
+
+    .table thead th {
+      background: #f8fafc;
+      color: #475569;
+      font-size: 13px;
+      font-weight: 600;
+      border-top: none;
+      white-space: nowrap;
+    }
+
+    .table td {
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-active {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-inactive {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .btn-edit {
+      border: 1px solid #cdd8e5;
+      background: #fff;
+      color: #1f2937;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .empty-row {
+      text-align: center;
+      color: #6b7280;
+      padding: 24px 0 !important;
+    }
+
+    @media (max-width: 991.98px) {
+      .sidebar {
+        position: fixed;
+        z-index: 1040;
+        left: 0;
+        top: 0;
+      }
+      .content-area,
+      .content-area.expanded {
+        width: 100%;
+        padding: 16px;
+      }
+      .sidebar.collapsed {
+        transform: translateX(-100%);
+        width: 260px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="d-flex page-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-box">
+        <div class="brand-title">ERP</div>
+        <button type="button" class="toggle-btn" id="sidebarToggle">☰</button>
+      </div>
+
+      <div class="nav-section">
+        <div class="group-title role-item" data-roles="Admin,Manager,User">Master Data</div>
+
+        <a href="javascript:void(0)" class="menu-link active role-item" data-roles="Admin,Manager,User">
+          <span class="menu-icon">📁</span>
+          <span class="menu-text">Master Data</span>
+        </a>
+
+        <a href="customer_inq.html" class="submenu-link active role-item" data-roles="Admin,Manager,User">
+          <span class="menu-sub">Customer</span>
+        </a>
+
+        <a href="javascript:void(0)" class="submenu-link role-item" data-roles="Admin,Manager">
+          <span class="menu-sub">Vendor</span>
+        </a>
+
+        <a href="javascript:void(0)" class="submenu-link role-item" data-roles="Admin,Manager">
+          <span class="menu-sub">Material</span>
+        </a>
+
+        <a href="javascript:void(0)" class="submenu-link role-item" data-roles="Admin">
+          <span class="menu-sub">Tax</span>
+        </a>
+
+        <a href="javascript:void(0)" class="submenu-link role-item" data-roles="Admin">
+          <span class="menu-sub">GL Account</span>
+        </a>
+      </div>
+    </aside>
+
+    <main class="content-area flex-grow-1" id="contentArea">
+      <div class="page-card">
+        <div class="page-head">
+          <div class="d-flex flex-wrap justify-content-between align-items-center">
+            <div>
+              <h1 class="page-title">Customer Inquiry</h1>
+              <p class="page-subtitle">Search and manage customer master data.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <div class="row align-items-center">
+            <div class="col-lg-6 col-md-8 mb-2 mb-md-0">
+              <div class="search-box">
+                <input type="text" id="txtSearch" class="form-control" placeholder="Search by customer code, name, email or phone">
+              </div>
+            </div>
+            <div class="col-lg-6 col-md-4 text-md-right">
+              <button type="button" class="btn btn-primary-custom" id="btnAddCustomer">Add Customer</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap table-responsive">
+          <table class="table table-hover mb-0" id="customerTable">
+            <thead>
+              <tr>
+                <th style="width: 70px;">#</th>
+                <th>Customer Code</th>
+                <th>Customer Name</th>
+                <th>Contact Person</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th style="width: 100px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="customerTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="text/template" id="customerRowTmpl">
+    <% if(customers && customers.length){ %>
+      <% _.each(customers, function(customer, index){ %>
+        <tr>
+          <td><%= index + 1 %></td>
+          <td><%= customer.customer_code || '-' %></td>
+          <td><%= customer.customer_name || '-' %></td>
+          <td><%= customer.contact_person || '-' %></td>
+          <td><%= customer.email || '-' %></td>
+          <td><%= customer.phone || '-' %></td>
+          <td>
+            <span class="status-pill <%= customer.is_active === 'Y' ? 'status-active' : 'status-inactive' %>">
+              <%= customer.is_active === 'Y' ? 'Active' : 'Inactive' %>
+            </span>
+          </td>
+          <td>
+            <button type="button" class="btn-edit btnEditCustomer" data-id="<%= customer.customer_id %>">Edit</button>
+          </td>
+        </tr>
+      <% }); %>
+    <% } else { %>
+      <tr>
+        <td colspan="8" class="empty-row">No customer records found.</td>
+      </tr>
+    <% } %>
+  </script>
+
+  <script src="scripts/customer_inq.js"></script>
+</body>
+</html>

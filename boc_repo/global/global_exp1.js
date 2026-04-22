@@ -13,12 +13,26 @@ function isUserLoggedIn(){
 	var userName = sessionStorage.getItem("USERNAME");
 	
 	if(userName == null || userName == "" || userName == undefined){
-		location.href = "../index.html";		
+		location.href = getLoginPagePath();		
 	}
 	if(userId == null || userId == "" || userId == undefined){
-		location.href = "../index.html";
+		location.href = getLoginPagePath();
 	}	
 	
+}
+
+function getLoginPagePath(){
+	var pathName = window.location.pathname || "";
+
+	if(pathName.indexOf("/pages/") > -1 || pathName.indexOf("\\pages\\") > -1){
+		return "../../index.html";
+	}
+
+	if(pathName.indexOf("/_webpages/") > -1 || pathName.indexOf("\\_webpages\\") > -1){
+		return "../index.html";
+	}
+
+	return "index.html";
 }
 
 function collapseMenu() {
@@ -175,7 +189,7 @@ function setUsrName(){
 function functionLogout(){
 	sessionStorage.clear();
 	localStorage.clear();
-	location.href = "../index.html"
+	location.href = getLoginPagePath()
 }
 
 

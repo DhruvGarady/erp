@@ -374,7 +374,7 @@
           saveAuth(response);
           showInlineMessage('success', 'Login successful. Redirecting...');
           setTimeout(function() {
-            window.location.href = '_webpages/home.html';
+            window.location.href = 'pages/home.html';
           }, 500);
         },
         error: function(xhr) {
@@ -395,7 +395,7 @@
       var userId = sessionStorage.getItem('USER_ID');
 
       if (token && userId) {
-        window.location.href = '_webpages/home.html';
+        window.location.href = 'pages/home.html';
         return;
       }
 

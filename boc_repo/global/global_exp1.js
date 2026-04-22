@@ -28,11 +28,21 @@ function getLoginPagePath(){
 		return "../../index.html";
 	}
 
-	if(pathName.indexOf("/_webpages/") > -1 || pathName.indexOf("\\_webpages\\") > -1){
-		return "../index.html";
+	return "index.html";
+}
+
+function getHomePagePath(){
+	var pathName = window.location.pathname || "";
+
+	if(pathName.indexOf("/pages/masterdata/") > -1 || pathName.indexOf("\\pages\\masterdata\\") > -1){
+		return "../home.html";
 	}
 
-	return "index.html";
+	if(pathName.indexOf("/pages/") > -1 || pathName.indexOf("\\pages\\") > -1){
+		return "home.html";
+	}
+
+	return "pages/home.html";
 }
 
 function collapseMenu() {
@@ -67,7 +77,7 @@ function userLogin() {
 	var id = sessionStorage.getItem("USER_ID")
 	if(id != null && id != "" && id != undefined){
 			alert("User already logged in!");
-			location.href = "_webpages/home.html"
+			location.href = getHomePagePath()
 		}else{
 	
 				var jsonData ={
@@ -105,7 +115,7 @@ function onUserLoginSuccess(response) {
 		sessionStorage.setItem("USERNAME",response.username);
 		sessionStorage.setItem("PROFILE_PICTURE", response.profile_picture || "https://lms-imgs.s3.ap-south-1.amazonaws.com/default-profilepic.jpg");
 
-		location.href = "_webpages/home.html";
+		location.href = getHomePagePath();
 }
 
 function onUserLoginErr(){

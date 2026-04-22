@@ -2,19 +2,19 @@ var customerList = [];
 var filteredCustomerList = [];
 
 $(function () {
-  isUserLoggedIn();
-  applyRoleVisibility();
-  applyUserInfo();
+  if (!initErpShell({
+    loginPath: '../../index.html',
+    logoutPath: '../../index.html',
+    sidebarStateKey: 'ERP_SIDEBAR'
+  })) {
+    return;
+  }
+
   bindCustomerInquiryEvents();
-  loadSidebarState();
   getCustomerList();
 });
 
 function bindCustomerInquiryEvents() {
-  $('#sidebarToggle').on('click', function () {
-    toggleSidebar();
-  });
-
   $('#txtSearch').on('keyup', function () {
     filterCustomerList($(this).val());
   });
@@ -99,54 +99,4 @@ function getAuthHeaders() {
   return {
     Authorization: 'Bearer ' + token
   };
-}
-
-function applyRoleVisibility() {
-  var roleName = sessionStorage.getItem('ROLE_NAME') || 'User';
-
-  $('.role-item').each(function () {
-    var roles = ($(this).data('roles') || '').split(',');
-    var allowed = false;
-
-    for (var i = 0; i < roles.length; i++) {
-      if ($.trim(roles[i]).toLowerCase() === roleName.toLowerCase()) {
-        allowed = true;
-        break;
-      }
-    }
-
-    if (allowed) {
-      $(this).show();
-    } else {
-      $(this).hide();
-    }
-  });
-}
-
-function toggleSidebar() {
-  $('#sidebar').toggleClass('collapsed');
-  $('#contentArea').toggleClass('expanded');
-
-  var state = $('#sidebar').hasClass('collapsed') ? 'COLLAPSED' : 'FULL';
-  sessionStorage.setItem('MASTERDATA_SIDEBAR', state);
-}
-
-function loadSidebarState() {
-  var state = sessionStorage.getItem('MASTERDATA_SIDEBAR') || 'FULL';
-  if (state === 'COLLAPSED') {
-    $('#sidebar').addClass('collapsed');
-    $('#contentArea').addClass('expanded');
-  }
-}
-
-function applyUserInfo() {
-  var fullName = sessionStorage.getItem('FULL_NAME') || sessionStorage.getItem('USERNAME') || 'User';
-  var roleName = sessionStorage.getItem('ROLE_NAME') || 'ERP User';
-  var initials = $.map(fullName.replace(/\s+/g, ' ').trim().split(' ').slice(0, 2), function (part) {
-    return part ? part.charAt(0).toUpperCase() : '';
-  }).join('') || 'U';
-
-  $('#userName').text(fullName);
-  $('#userRole').text(roleName);
-  $('#railAvatar').text(initials);
 }

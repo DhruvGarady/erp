@@ -14,46 +14,53 @@
   <div class="app-shell">
     <aside class="erp-sidebar" id="sidebar">
       <div class="sidebar-rail">
-        <button type="button" class="rail-toggle" id="sidebarToggle" aria-label="Toggle sidebar">=</button>
+        <button type="button" class="rail-toggle" id="sidebarToggle" aria-label="Toggle sidebar">NAV</button>
         <div class="rail-avatar" id="railAvatar">U</div>
-        <a href="home.html" class="rail-item active">MD</a>
-        <a href="javascript:void(0)" class="rail-item">TR</a>
-        <a href="javascript:void(0)" class="rail-item">FN</a>
+        <a href="home.html" class="rail-item active" title="Master Data">MD</a>
+        <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Manager,Sales" title="Sales and Distribution">SD</a>
+        <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Manager,Procurement" title="Materials Management">MM</a>
+        <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Accounts,Manager" title="Financial Accounting">FI</a>
+        <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Accounts,Manager" title="Controlling">CO</a>
+        <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,HR,Manager" title="Human Capital Management">HC</a>
+        <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Quality,Manager" title="Quality Management">QM</a>
+        <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Maintenance,Manager" title="Plant Maintenance">PM</a>
         <div class="rail-spacer"></div>
+        <button type="button" class="rail-theme" id="themeToggle" aria-label="Toggle theme">DK</button>
       </div>
 
       <div class="sidebar-panel">
         <div class="panel-head">
-          <h2>MASTERDATA</h2>
+          <h2>MASTER DATA</h2>
           <button type="button" class="panel-add">+</button>
         </div>
 
         <div class="panel-group">
-          <div class="panel-label">OVERVIEW</div>
-          <a href="home.html" class="panel-link active">Home</a>
+          <div class="panel-label">CORE MODULES</div>
+          <a href="home.html" class="panel-link active"><span>Master Data</span><span class="module-badge">LIVE</span></a>
+          <a href="javascript:void(0)" class="panel-link disabled"><span>SD Sales & Distribution</span><span class="module-badge">NEXT</span></a>
+          <a href="javascript:void(0)" class="panel-link disabled"><span>MM Materials Management</span><span class="module-badge">NEXT</span></a>
+          <a href="javascript:void(0)" class="panel-link disabled"><span>FI Financial Accounting</span><span class="module-badge">NEXT</span></a>
+          <a href="javascript:void(0)" class="panel-link disabled"><span>CO Controlling</span><span class="module-badge">NEXT</span></a>
+          <a href="javascript:void(0)" class="panel-link disabled"><span>HCM Human Capital</span><span class="module-badge">NEXT</span></a>
+          <a href="javascript:void(0)" class="panel-link disabled"><span>QM Quality Management</span><span class="module-badge">NEXT</span></a>
+          <a href="javascript:void(0)" class="panel-link disabled"><span>PM Plant Maintenance</span><span class="module-badge">NEXT</span></a>
         </div>
 
         <div class="panel-group">
-          <div class="panel-label">MASTER DATA</div>
-          <a href="masterdata/customer_inq.html" class="panel-link">Customers</a>
-          <a href="javascript:void(0)" class="panel-link">Vendors</a>
-          <a href="javascript:void(0)" class="panel-link">Materials</a>
-          <a href="javascript:void(0)" class="panel-link">Warehouses</a>
-          <a href="javascript:void(0)" class="panel-link">GL Accounts</a>
-        </div>
-
-        <div class="panel-group">
-          <div class="panel-label">NEXT MODULES</div>
-          <a href="javascript:void(0)" class="panel-link">Transactions</a>
-          <a href="javascript:void(0)" class="panel-link">Finance</a>
-          <a href="javascript:void(0)" class="panel-link">Reports</a>
+          <div class="panel-label">MASTER DATA MENUS</div>
+          <a href="masterdata/customer_inq.html" class="panel-link role-item" data-roles="Admin,Manager,User,Sales">Customers</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin,Manager,Procurement">Vendors</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin,Manager,Procurement">Materials</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin,Manager">UOM / Currency / Tax</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin,Manager,Accounts">GL Accounts</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin,Manager,Production">BOM / BOM Items</a>
         </div>
       </div>
     </aside>
 
     <main class="main-area">
       <header class="app-topbar">
-        <h1>Home</h1>
+        <h1>ERP Home</h1>
         <div class="topbar-right">
           <div class="user-meta">
             <p class="user-name" id="userName">User</p>
@@ -67,7 +74,7 @@
         <div class="page-card">
           <div class="page-head">
             <h2 id="welcomeTitle">Welcome back</h2>
-            <p>Use the sidebar to open Master Data. Other modules can be added into this same structure.</p>
+            <p>The shell is now module-ready. We can attach each process chain into this navigation as we implement modules.</p>
           </div>
           <div class="quick-grid">
             <a class="quick-card" href="masterdata/customer_inq.html">
@@ -78,12 +85,12 @@
             <a class="quick-card" href="javascript:void(0)">
               <span class="quick-icon">VM</span>
               <h3>Vendor Master</h3>
-              <p>Keep supplier information organized.</p>
+              <p>Supplier profile and procurement setup.</p>
             </a>
             <a class="quick-card" href="javascript:void(0)">
-              <span class="quick-icon">MM</span>
-              <h3>Material Master</h3>
-              <p>Manage item master and classifications.</p>
+              <span class="quick-icon">GL</span>
+              <h3>GL Account Master</h3>
+              <p>Chart of accounts and financial mapping.</p>
             </a>
           </div>
         </div>
@@ -91,60 +98,7 @@
     </main>
   </div>
 
-  <script>
-    function requireLogin() {
-      var token = sessionStorage.getItem('TOKEN');
-      var userId = sessionStorage.getItem('USER_ID');
-
-      if (!token || !userId) {
-        window.location.href = '../index.html';
-        return false;
-      }
-
-      return true;
-    }
-
-    function applyUserInfo() {
-      var fullName = sessionStorage.getItem('FULL_NAME') || sessionStorage.getItem('USERNAME') || 'User';
-      var roleName = sessionStorage.getItem('ROLE_NAME') || 'ERP User';
-      var initials = fullName.replace(/\s+/g, ' ').trim().split(' ').slice(0, 2).map(function(part) {
-        return part.charAt(0).toUpperCase();
-      }).join('') || 'U';
-
-      document.getElementById('userName').textContent = fullName;
-      document.getElementById('userRole').textContent = roleName;
-      document.getElementById('railAvatar').textContent = initials;
-      document.getElementById('welcomeTitle').textContent = 'Welcome back, ' + fullName;
-    }
-
-    function loadSidebarState() {
-      var state = sessionStorage.getItem('HOME_SIDEBAR') || 'FULL';
-      if (state === 'COLLAPSED') {
-        document.getElementById('sidebar').classList.add('collapsed');
-        document.getElementById('contentArea').classList.add('expanded');
-      }
-    }
-
-    function toggleSidebar() {
-      var sidebar = document.getElementById('sidebar');
-      var contentArea = document.getElementById('contentArea');
-      sidebar.classList.toggle('collapsed');
-      contentArea.classList.toggle('expanded');
-      sessionStorage.setItem('HOME_SIDEBAR', sidebar.classList.contains('collapsed') ? 'COLLAPSED' : 'FULL');
-    }
-
-    function logout() {
-      sessionStorage.clear();
-      localStorage.clear();
-      window.location.href = '../index.html';
-    }
-
-    if (requireLogin()) {
-      applyUserInfo();
-      loadSidebarState();
-      document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
-      document.getElementById('logoutBtn').addEventListener('click', logout);
-    }
-  </script>
+  <script src="../global/erp_shell.js"></script>
+  <script src="scripts/home.js"></script>
 </body>
 </html>

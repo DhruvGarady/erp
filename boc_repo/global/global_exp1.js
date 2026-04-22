@@ -24,8 +24,12 @@ function isUserLoggedIn(){
 function getLoginPagePath(){
 	var pathName = window.location.pathname || "";
 
-	if(pathName.indexOf("/pages/") > -1 || pathName.indexOf("\\pages\\") > -1){
+	if(pathName.indexOf("/pages/masterdata/") > -1 || pathName.indexOf("\\pages\\masterdata\\") > -1){
 		return "../../index.html";
+	}
+
+	if(pathName.indexOf("/pages/") > -1 || pathName.indexOf("\\pages\\") > -1){
+		return "../index.html";
 	}
 
 	return "index.html";

@@ -887,3 +887,262 @@ a {
     padding-right: 12px;
   }
 }
+
+/* Simple Inquiry + Add/Edit standard (content only, sidebar unchanged) */
+.sp-content {
+  display: grid;
+  gap: 18px;
+}
+
+.sp-hero {
+  background: linear-gradient(135deg, rgba(47, 111, 237, 0.12), rgba(138, 92, 255, 0.08));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: var(--shadow-soft);
+}
+
+.sp-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.sp-hero h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.sp-hero p {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 820px;
+}
+
+.sp-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sp-btn-soft,
+.sp-btn-outline,
+.sp-btn-primary {
+  height: 42px;
+  padding: 0 15px;
+  border-radius: 12px;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sp-btn-soft {
+  background: var(--surface);
+  color: var(--text-main);
+  border: 1px solid var(--line);
+}
+
+.sp-btn-outline {
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-main);
+  border: 1px solid var(--line);
+}
+
+.sp-btn-primary {
+  background: linear-gradient(135deg, var(--accent), #8b52ef);
+  color: #fff;
+}
+
+.sp-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.sp-card-head {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.sp-card-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.sp-card-head small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.sp-search-row {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.sp-input,
+.sp-select,
+.sp-textarea {
+  width: 100%;
+  border: 1px solid #d7e3f0;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-main);
+  font-size: 14px;
+  padding: 10px 13px;
+  outline: 0;
+}
+
+.sp-input,
+.sp-select {
+  height: 44px;
+}
+
+.sp-textarea {
+  min-height: 106px;
+  resize: vertical;
+}
+
+.sp-input:focus,
+.sp-select:focus,
+.sp-textarea:focus {
+  border-color: rgba(47, 111, 237, 0.55);
+  box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.1);
+}
+
+.sp-table-wrap {
+  padding: 0 20px 20px;
+}
+
+.sp-table thead th {
+  border-top: none;
+  border-bottom: 1px solid var(--line);
+  background: #f8fbff;
+  color: #4e5d73;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.sp-table td {
+  vertical-align: middle;
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.sp-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #2051b2;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sp-btn-edit {
+  border: 1px solid #d7e2ef;
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.sp-empty {
+  text-align: center;
+  color: var(--text-soft);
+  padding: 24px 0 !important;
+}
+
+.sp-form-body {
+  padding: 20px;
+}
+
+.sp-section-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sp-section-title:before {
+  content: "";
+  width: 24px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #8a5cff);
+}
+
+.sp-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.sp-footer {
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.92));
+}
+
+.sp-note {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.sp-footer-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sp-btn-cancel {
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 16px;
+  border: 1px solid #d7e2ef;
+  background: var(--surface);
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.sp-btn-save {
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 16px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), #8a5cff);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  min-width: 140px;
+}

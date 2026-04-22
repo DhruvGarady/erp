@@ -84,6 +84,9 @@ a {
   font-size: 14px;
   line-height: 1;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .rail-avatar {
@@ -139,7 +142,7 @@ a {
 .panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   margin-bottom: 14px;
 }
 
@@ -159,6 +162,51 @@ a {
   color: #ffffff;
   font-size: 16px;
   line-height: 1;
+}
+
+.icon-menu {
+  width: 16px;
+  height: 12px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.icon-menu span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  border-radius: 2px;
+  background: #dbe2ee;
+}
+
+.icon-theme {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+}
+
+.rail-theme[data-mode="light"] .icon-theme {
+  border: 2px solid #f1c94f;
+  background: #f1c94f;
+}
+
+.rail-theme[data-mode="dark"] .icon-theme {
+  border: 2px solid #b7c2d6;
+  background: transparent;
+}
+
+.rail-theme[data-mode="dark"] .icon-theme::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surface-rail);
 }
 
 .panel-group {

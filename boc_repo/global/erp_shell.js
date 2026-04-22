@@ -46,7 +46,7 @@
     document.documentElement.setAttribute("data-theme", mode);
     var toggle = document.getElementById("themeToggle");
     if (toggle) {
-      toggle.textContent = mode === "dark" ? "LT" : "DK";
+      toggle.setAttribute("data-mode", mode);
       toggle.setAttribute("aria-label", mode === "dark" ? "Switch to light mode" : "Switch to dark mode");
     }
   }

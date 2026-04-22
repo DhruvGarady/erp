@@ -22,7 +22,9 @@
   <div class="app-shell">
     <aside class="erp-sidebar" id="sidebar">
       <div class="sidebar-rail">
-        <button type="button" class="rail-toggle" id="sidebarToggle" aria-label="Toggle sidebar">NAV</button>
+        <button type="button" class="rail-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+          <span class="icon-menu"><span></span><span></span><span></span></span>
+        </button>
         <div class="rail-avatar" id="railAvatar">U</div>
         <a href="../home.html" class="rail-item active" title="Master Data">MD</a>
         <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Manager,Sales" title="Sales and Distribution">SD</a>
@@ -33,13 +35,14 @@
         <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Quality,Manager" title="Quality Management">QM</a>
         <a href="javascript:void(0)" class="rail-item role-item" data-roles="Admin,Maintenance,Manager" title="Plant Maintenance">PM</a>
         <div class="rail-spacer"></div>
-        <button type="button" class="rail-theme" id="themeToggle" aria-label="Toggle theme">DK</button>
+        <button type="button" class="rail-theme" id="themeToggle" aria-label="Toggle theme" data-mode="light">
+          <span class="icon-theme"></span>
+        </button>
       </div>
 
       <div class="sidebar-panel">
         <div class="panel-head">
           <h2>MASTER DATA</h2>
-          <button type="button" class="panel-add">+</button>
         </div>
 
         <div class="panel-group">

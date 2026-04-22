@@ -1,5 +1,6 @@
 var customerList = [];
 var filteredCustomerList = [];
+var canManageCustomer = false;
 
 $(function () {
   if (!initErpShell({
@@ -10,7 +11,9 @@ $(function () {
     return;
   }
 
+  canManageCustomer = hasCustomerManageAccess();
   bindCustomerInquiryEvents();
+  applyActionAccess();
   getCustomerList();
 });
 
@@ -20,12 +23,14 @@ function bindCustomerInquiryEvents() {
   });
 
   $('#btnAddCustomer').on('click', function () {
-    location.href = 'customer_form.html';
+    if (!canManageCustomer) return;
+    location.href = 'customer_add.html';
   });
 
   $(document).on('click', '.btnEditCustomer', function () {
+    if (!canManageCustomer) return;
     var customerId = $(this).data('id');
-    location.href = 'customer_form.html?id=' + customerId;
+    location.href = 'customer_edit.html?id=' + customerId;
   });
 }
 
@@ -68,7 +73,10 @@ function normalizeCustomerResponse(response) {
 
 function renderCustomerTable(customers) {
   var tmpl = $('#customerRowTmpl').html();
-  $('#customerTableBody').html(_.template(tmpl)({ customers: customers }));
+  $('#customerTableBody').html(_.template(tmpl)({
+    customers: customers,
+    canManageCustomer: canManageCustomer
+  }));
 }
 
 function filterCustomerList(searchText) {
@@ -99,4 +107,15 @@ function getAuthHeaders() {
   return {
     Authorization: 'Bearer ' + token
   };
+}
+
+function hasCustomerManageAccess() {
+  var role = (sessionStorage.getItem('ROLE_NAME') || '').toLowerCase();
+  return role === 'admin' || role === 'manager';
+}
+
+function applyActionAccess() {
+  if (!canManageCustomer) {
+    $('#btnAddCustomer').prop('disabled', true).text('View Only');
+  }
 }

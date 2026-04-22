@@ -134,7 +134,11 @@
             </span>
           </td>
           <td>
-            <button type="button" class="btn-edit btnEditCustomer" data-id="<%= customer.customer_id %>">Edit</button>
+            <% if(canManageCustomer){ %>
+              <button type="button" class="btn-edit btnEditCustomer" data-id="<%= customer.customer_id %>">Edit</button>
+            <% } else { %>
+              <span class="text-muted">View</span>
+            <% } %>
           </td>
         </tr>
       <% }); %>

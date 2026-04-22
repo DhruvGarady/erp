@@ -4,6 +4,7 @@ var filteredCustomerList = [];
 $(function () {
   isUserLoggedIn();
   applyRoleVisibility();
+  applyUserInfo();
   bindCustomerInquiryEvents();
   loadSidebarState();
   getCustomerList();
@@ -136,4 +137,16 @@ function loadSidebarState() {
     $('#sidebar').addClass('collapsed');
     $('#contentArea').addClass('expanded');
   }
+}
+
+function applyUserInfo() {
+  var fullName = sessionStorage.getItem('FULL_NAME') || sessionStorage.getItem('USERNAME') || 'User';
+  var roleName = sessionStorage.getItem('ROLE_NAME') || 'ERP User';
+  var initials = $.map(fullName.replace(/\s+/g, ' ').trim().split(' ').slice(0, 2), function (part) {
+    return part ? part.charAt(0).toUpperCase() : '';
+  }).join('') || 'U';
+
+  $('#userName').text(fullName);
+  $('#userRole').text(roleName);
+  $('#railAvatar').text(initials);
 }

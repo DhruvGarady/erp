@@ -7,352 +7,105 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <link rel="stylesheet" href="../../global/libs/jquery/jquery-ui.css">
+  <link rel="stylesheet" href="../../global/css/style_et_1.css">
 
   <script src="../../global/libs/jquery/jquery.min.js" type="text/javascript"></script>
   <script src="../../global/libs/bootstrap/bootstrap.min.js" type="text/javascript"></script>
   <script src="../../global/libs/underscore/underscore.js" type="text/javascript"></script>
   <script src="../../global/global_exp1.js" type="text/javascript"></script>
   <script src="../../global/properties.js" type="text/javascript"></script>
-
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #f5f7fb;
-      color: #1f2937;
-      overflow-x: hidden;
-    }
-
-    .page-shell {
-      min-height: 100vh;
-    }
-
-    .sidebar {
-      width: 260px;
-      min-height: 100vh;
-      background: #111827;
-      color: #fff;
-      transition: width 0.25s ease;
-      position: sticky;
-      top: 0;
-    }
-
-    .sidebar.collapsed {
-      width: 76px;
-    }
-
-    .brand-box {
-      height: 64px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      border-bottom: 1px solid rgba(255,255,255,.08);
-    }
-
-    .brand-title {
-      font-size: 18px;
-      font-weight: 700;
-      white-space: nowrap;
-      overflow: hidden;
-    }
-
-    .sidebar.collapsed .brand-title,
-    .sidebar.collapsed .menu-text,
-    .sidebar.collapsed .menu-sub,
-    .sidebar.collapsed .group-title {
-      display: none;
-    }
-
-    .toggle-btn {
-      background: rgba(255,255,255,.08);
-      border: none;
-      color: #fff;
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      font-size: 18px;
-      line-height: 1;
-    }
-
-    .nav-section {
-      padding: 14px 10px 24px;
-    }
-
-    .group-title {
-      font-size: 11px;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,.45);
-      padding: 10px 12px 8px;
-    }
-
-    .menu-link,
-    .submenu-link {
-      display: flex;
-      align-items: center;
-      color: rgba(255,255,255,.88);
-      text-decoration: none;
-      border-radius: 10px;
-      transition: all .2s ease;
-    }
-
-    .menu-link {
-      padding: 12px;
-      margin-bottom: 6px;
-    }
-
-    .submenu-link {
-      padding: 10px 12px 10px 46px;
-      font-size: 14px;
-      margin-bottom: 4px;
-      color: rgba(255,255,255,.72);
-    }
-
-    .sidebar.collapsed .submenu-link {
-      justify-content: center;
-      padding: 10px 0;
-    }
-
-    .menu-link:hover,
-    .submenu-link:hover,
-    .menu-link.active,
-    .submenu-link.active {
-      background: #1f6feb;
-      color: #fff;
-      text-decoration: none;
-    }
-
-    .menu-icon {
-      width: 30px;
-      min-width: 30px;
-      text-align: center;
-      font-size: 18px;
-      margin-right: 12px;
-    }
-
-    .sidebar.collapsed .menu-icon {
-      margin-right: 0;
-    }
-
-    .content-area {
-      padding: 24px;
-      width: calc(100% - 260px);
-      transition: width .25s ease;
-    }
-
-    .content-area.expanded {
-      width: calc(100% - 76px);
-    }
-
-    .page-card {
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
-      border: 1px solid #e6edf5;
-    }
-
-    .page-head {
-      padding: 20px 22px;
-      border-bottom: 1px solid #edf2f7;
-    }
-
-    .page-title {
-      font-size: 24px;
-      font-weight: 700;
-      margin: 0;
-    }
-
-    .page-subtitle {
-      margin: 6px 0 0;
-      color: #6b7280;
-      font-size: 14px;
-    }
-
-    .toolbar {
-      padding: 18px 22px;
-      border-bottom: 1px solid #edf2f7;
-    }
-
-    .search-box {
-      position: relative;
-    }
-
-    .search-box input {
-      height: 44px;
-      border-radius: 10px;
-      border: 1px solid #d7e0ea;
-      padding-left: 14px;
-    }
-
-    .btn-primary-custom {
-      height: 44px;
-      border: none;
-      border-radius: 10px;
-      background: #1f6feb;
-      color: #fff;
-      padding: 0 18px;
-      font-weight: 600;
-    }
-
-    .btn-primary-custom:hover {
-      background: #1859bd;
-      color: #fff;
-    }
-
-    .table-wrap {
-      padding: 0 22px 22px;
-    }
-
-    .table thead th {
-      background: #f8fafc;
-      color: #475569;
-      font-size: 13px;
-      font-weight: 600;
-      border-top: none;
-      white-space: nowrap;
-    }
-
-    .table td {
-      vertical-align: middle;
-      font-size: 14px;
-    }
-
-    .status-pill {
-      display: inline-block;
-      padding: 5px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .status-active {
-      background: #dcfce7;
-      color: #166534;
-    }
-
-    .status-inactive {
-      background: #fee2e2;
-      color: #991b1b;
-    }
-
-    .btn-edit {
-      border: 1px solid #cdd8e5;
-      background: #fff;
-      color: #1f2937;
-      border-radius: 8px;
-      padding: 6px 12px;
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    .empty-row {
-      text-align: center;
-      color: #6b7280;
-      padding: 24px 0 !important;
-    }
-
-    @media (max-width: 991.98px) {
-      .sidebar {
-        position: fixed;
-        z-index: 1040;
-        left: 0;
-        top: 0;
-      }
-      .content-area,
-      .content-area.expanded {
-        width: 100%;
-        padding: 16px;
-      }
-      .sidebar.collapsed {
-        transform: translateX(-100%);
-        width: 260px;
-      }
-    }
-  </style>
 </head>
 <body>
-  <div class="d-flex page-shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand-box">
-        <div class="brand-title">ERP</div>
-        <button type="button" class="toggle-btn" id="sidebarToggle">☰</button>
+  <div class="app-shell">
+    <aside class="erp-sidebar" id="sidebar">
+      <div class="sidebar-rail">
+        <button type="button" class="rail-toggle" id="sidebarToggle" aria-label="Toggle sidebar">=</button>
+        <div class="rail-avatar" id="railAvatar">U</div>
+        <a href="../home.html" class="rail-item active">MD</a>
+        <a href="javascript:void(0)" class="rail-item">TR</a>
+        <a href="javascript:void(0)" class="rail-item">FN</a>
+        <div class="rail-spacer"></div>
       </div>
 
-      <div class="nav-section">
-        <div class="group-title role-item" data-roles="Admin,Manager,User">Master Data</div>
+      <div class="sidebar-panel">
+        <div class="panel-head">
+          <h2>MASTERDATA</h2>
+          <button type="button" class="panel-add">+</button>
+        </div>
 
-        <a href="javascript:void(0)" class="menu-link active role-item" data-roles="Admin,Manager,User">
-          <span class="menu-icon">📁</span>
-          <span class="menu-text">Master Data</span>
-        </a>
+        <div class="panel-group">
+          <div class="panel-label">OVERVIEW</div>
+          <a href="../home.html" class="panel-link">Home</a>
+        </div>
 
-        <a href="customer_inq.html" class="submenu-link active role-item" data-roles="Admin,Manager,User">
-          <span class="menu-sub">Customer</span>
-        </a>
+        <div class="panel-group">
+          <div class="panel-label">MASTER DATA</div>
+          <a href="customer_inq.html" class="panel-link active role-item" data-roles="Admin,Manager,User">Customers</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin,Manager">Vendors</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin,Manager">Materials</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin">Tax</a>
+          <a href="javascript:void(0)" class="panel-link role-item" data-roles="Admin">GL Accounts</a>
+        </div>
 
-        <a href="javascript:void(0)" class="submenu-link role-item" data-roles="Admin,Manager">
-          <span class="menu-sub">Vendor</span>
-        </a>
-
-        <a href="javascript:void(0)" class="submenu-link role-item" data-roles="Admin,Manager">
-          <span class="menu-sub">Material</span>
-        </a>
-
-        <a href="javascript:void(0)" class="submenu-link role-item" data-roles="Admin">
-          <span class="menu-sub">Tax</span>
-        </a>
-
-        <a href="javascript:void(0)" class="submenu-link role-item" data-roles="Admin">
-          <span class="menu-sub">GL Account</span>
-        </a>
+        <div class="panel-group">
+          <div class="panel-label">NEXT MODULES</div>
+          <a href="javascript:void(0)" class="panel-link">Transactions</a>
+          <a href="javascript:void(0)" class="panel-link">Finance</a>
+          <a href="javascript:void(0)" class="panel-link">Reports</a>
+        </div>
       </div>
     </aside>
 
-    <main class="content-area flex-grow-1" id="contentArea">
-      <div class="page-card">
-        <div class="page-head">
-          <div class="d-flex flex-wrap justify-content-between align-items-center">
-            <div>
-              <h1 class="page-title">Customer Inquiry</h1>
-              <p class="page-subtitle">Search and manage customer master data.</p>
-            </div>
+    <main class="main-area">
+      <header class="app-topbar">
+        <h1>Customer Inquiry</h1>
+        <div class="topbar-right">
+          <div class="user-meta">
+            <p class="user-name" id="userName">User</p>
+            <p class="user-role" id="userRole">ERP User</p>
           </div>
         </div>
+      </header>
 
-        <div class="toolbar">
-          <div class="row align-items-center">
-            <div class="col-lg-6 col-md-8 mb-2 mb-md-0">
-              <div class="search-box">
-                <input type="text" id="txtSearch" class="form-control" placeholder="Search by customer code, name, email or phone">
+      <section class="content-area" id="contentArea">
+        <div class="page-card">
+          <div class="page-head">
+            <h2>Customer Master</h2>
+            <p>Search and manage customer master data.</p>
+          </div>
+
+          <div class="toolbar">
+            <div class="row align-items-center">
+              <div class="col-lg-6 col-md-8 mb-2 mb-md-0">
+                <input type="text" id="txtSearch" class="form-control search-input" placeholder="Search by code, name, contact, email, or phone">
+              </div>
+              <div class="col-lg-6 col-md-4 text-md-right">
+                <button type="button" class="btn-primary-custom" id="btnAddCustomer">Add Customer</button>
               </div>
             </div>
-            <div class="col-lg-6 col-md-4 text-md-right">
-              <button type="button" class="btn btn-primary-custom" id="btnAddCustomer">Add Customer</button>
-            </div>
+          </div>
+
+          <div class="table-wrap table-responsive">
+            <table class="table table-hover mb-0" id="customerTable">
+              <thead>
+                <tr>
+                  <th style="width: 70px;">#</th>
+                  <th>Customer Code</th>
+                  <th>Customer Name</th>
+                  <th>Contact Person</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th style="width: 100px;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="customerTableBody"></tbody>
+            </table>
           </div>
         </div>
-
-        <div class="table-wrap table-responsive">
-          <table class="table table-hover mb-0" id="customerTable">
-            <thead>
-              <tr>
-                <th style="width: 70px;">#</th>
-                <th>Customer Code</th>
-                <th>Customer Name</th>
-                <th>Contact Person</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Status</th>
-                <th style="width: 100px;">Action</th>
-              </tr>
-            </thead>
-            <tbody id="customerTableBody"></tbody>
-          </table>
-        </div>
-      </div>
+      </section>
     </main>
   </div>
 

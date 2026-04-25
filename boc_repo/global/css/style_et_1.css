@@ -143,14 +143,16 @@ a {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .panel-head h2 {
   margin: 0;
-  font-size: 14px;
-  letter-spacing: 0.05em;
+  font-size: 13px;
+  letter-spacing: 0.08em;
   font-weight: 700;
+  color: var(--text-soft);
+  text-transform: uppercase;
 }
 
 .panel-add {
@@ -209,16 +211,66 @@ a {
   background: var(--surface-rail);
 }
 
-.panel-group {
-  margin-bottom: 14px;
+.sidebar-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.panel-label {
-  margin: 0 0 6px;
-  color: var(--text-soft);
-  font-size: 11px;
+.sidebar-section {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.section-toggle {
+  width: 100%;
+  height: 36px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-main);
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sidebar-section.is-open .section-toggle {
+  border-bottom-color: var(--line);
+  background: var(--surface-soft);
+}
+
+.section-caret {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-soft);
+  border-bottom: 2px solid var(--text-soft);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+  margin-top: -3px;
+}
+
+.sidebar-section.is-open .section-caret {
+  transform: rotate(225deg);
+  margin-top: 2px;
+}
+
+.section-body {
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.2s ease, opacity 0.2s ease;
+  overflow: hidden;
+}
+
+.sidebar-section.is-open .section-body {
+  max-height: 480px;
+  opacity: 1;
 }
 
 .panel-link {

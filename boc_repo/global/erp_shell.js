@@ -29,15 +29,88 @@
   function applyRoleVisibility(container) {
     var roleName = getUserRole().toLowerCase();
     var root = container || document;
-    var roleItems = root.querySelectorAll("[data-roles]");
+    var accessItems = root.querySelectorAll("[data-permission], [data-roles]");
+    var permissionMap = window.ERP_ROLE_PERMISSIONS || {
+      admin: ["*"],
+      manager: [
+        "md.customer.view", "md.vendor.view", "md.material.view", "md.material_group.view",
+        "md.uom.view", "md.currency.view", "md.tax.view", "md.payment_terms.view",
+        "md.warehouse.view", "md.gl_account.view", "md.bom.view"
+      ],
+      sales: ["md.customer.view", "md.material.view", "md.currency.view", "md.tax.view", "md.payment_terms.view"],
+      procurement: ["md.vendor.view", "md.material.view", "md.material_group.view", "md.uom.view", "md.warehouse.view"],
+      accounts: ["md.currency.view", "md.tax.view", "md.payment_terms.view", "md.gl_account.view", "md.customer.view", "md.vendor.view"],
+      production: ["md.material.view", "md.uom.view", "md.bom.view"],
+      user: ["md.customer.view"]
+    };
+    var granted = permissionMap[roleName] || permissionMap.user || [];
 
-    for (var i = 0; i < roleItems.length; i++) {
-      var node = roleItems[i];
-      var roles = getValue(node.getAttribute("data-roles"), "")
-        .split(",")
-        .map(function (entry) { return entry.trim().toLowerCase(); });
-      var allowed = roles.indexOf(roleName) > -1;
+    function matchesPermission(rule, need) {
+      if (rule === "*" || rule === need) return true;
+      if (rule.slice(-2) === ".*") {
+        return need.indexOf(rule.slice(0, -1)) === 0;
+      }
+      return false;
+    }
+
+    for (var i = 0; i < accessItems.length; i++) {
+      var node = accessItems[i];
+      var allowed = true;
+      var roleRule = getValue(node.getAttribute("data-roles"), "");
+      var permissionRule = getValue(node.getAttribute("data-permission"), "");
+
+      if (permissionRule) {
+        allowed = false;
+        var requested = permissionRule.split(",");
+        for (var r = 0; r < requested.length; r++) {
+          var needed = requested[r].trim();
+          for (var g = 0; g < granted.length; g++) {
+            if (matchesPermission(granted[g], needed)) {
+              allowed = true;
+              break;
+            }
+          }
+          if (allowed) break;
+        }
+      } else if (roleRule) {
+        var roles = roleRule
+          .split(",")
+          .map(function (entry) { return entry.trim().toLowerCase(); });
+        allowed = roles.indexOf(roleName) > -1;
+      }
+
       node.style.display = allowed ? "" : "none";
+    }
+
+    var sections = root.querySelectorAll(".sidebar-section");
+    for (var s = 0; s < sections.length; s++) {
+      var section = sections[s];
+      var links = section.querySelectorAll(".section-body .panel-link");
+      var visibleCount = 0;
+      for (var n = 0; n < links.length; n++) {
+        if (links[n].style.display !== "none") visibleCount++;
+      }
+      section.style.display = visibleCount > 0 ? "" : "none";
+    }
+  }
+
+  function bindSidebarSections() {
+    var sections = document.querySelectorAll(".sidebar-section");
+    for (var i = 0; i < sections.length; i++) {
+      (function (section) {
+        var toggle = section.querySelector(".section-toggle");
+        if (!toggle) return;
+
+        var initialOpen = section.getAttribute("data-default-open") === "true";
+        section.classList.toggle("is-open", initialOpen);
+        toggle.setAttribute("aria-expanded", initialOpen ? "true" : "false");
+
+        toggle.addEventListener("click", function () {
+          var isOpen = section.classList.contains("is-open");
+          section.classList.toggle("is-open", !isOpen);
+          toggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+        });
+      })(sections[i]);
     }
   }
 
@@ -173,6 +246,7 @@
     applyTheme();
     applyUserMeta(options);
     applyRoleVisibility(document);
+    bindSidebarSections();
     applySidebarState(options);
     bindSidebarToggle(options);
     bindLogout(options.logoutPath);

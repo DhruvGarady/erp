@@ -91,6 +91,12 @@
     if (!sidebar || !content) return;
 
     var state = sessionStorage.getItem(key) || "FULL";
+    if (window.innerWidth <= 900) {
+      sidebar.classList.remove("collapsed");
+      content.classList.remove("expanded");
+      return;
+    }
+
     if (state === "COLLAPSED") {
       sidebar.classList.add("collapsed");
       content.classList.add("expanded");
@@ -101,13 +107,44 @@
     var sidebar = document.getElementById("sidebar");
     var content = document.getElementById("contentArea");
     var toggle = document.getElementById("sidebarToggle");
+    var mobileToggle = document.getElementById("mobileSidebarBtn");
+    var backdrop = document.getElementById("sidebarBackdrop");
     var key = options.sidebarStateKey;
     if (!sidebar || !content || !toggle) return;
 
     toggle.addEventListener("click", function () {
+      if (window.innerWidth <= 900) {
+        sidebar.classList.toggle("open");
+        if (backdrop) {
+          backdrop.classList.toggle("show", sidebar.classList.contains("open"));
+        }
+        return;
+      }
+
       sidebar.classList.toggle("collapsed");
       content.classList.toggle("expanded");
       sessionStorage.setItem(key, sidebar.classList.contains("collapsed") ? "COLLAPSED" : "FULL");
+    });
+
+    if (mobileToggle) {
+      mobileToggle.addEventListener("click", function () {
+        sidebar.classList.add("open");
+        if (backdrop) backdrop.classList.add("show");
+      });
+    }
+
+    if (backdrop) {
+      backdrop.addEventListener("click", function () {
+        sidebar.classList.remove("open");
+        backdrop.classList.remove("show");
+      });
+    }
+
+    window.addEventListener("resize", function () {
+      if (window.innerWidth > 900) {
+        sidebar.classList.remove("open");
+        if (backdrop) backdrop.classList.remove("show");
+      }
     });
   }
 

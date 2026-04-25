@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="../global/css/style_et_1.css">
 </head>
 <body>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
   <div class="app-shell">
     <aside class="erp-sidebar" id="sidebar">
       <div class="sidebar-rail">
@@ -69,7 +70,12 @@
 
     <main class="main-area">
       <header class="app-topbar">
-        <h1>ERP Home</h1>
+        <div class="topbar-title-wrap">
+          <button type="button" class="topbar-menu-btn" id="mobileSidebarBtn" aria-label="Open sidebar">
+            <span class="icon-menu"><span></span><span></span><span></span></span>
+          </button>
+          <h1>ERP Home</h1>
+        </div>
         <div class="topbar-right">
           <div class="user-meta">
             <p class="user-name" id="userName">User</p>

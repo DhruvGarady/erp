@@ -72,16 +72,23 @@ function now() {
 }
 
 app.post("/auth/login", (req, res) => {
-    const { username, password } = req.body;
+    const username = (req.body.username || "").trim();
+    const password = req.body.password || req.body.password_hash || "";
 
     if (!username || !password) {
         return res.status(400).json({ error: "Username and password are required" });
     }
 
     const sql = `
-        SELECT *
+        SELECT
+            user_id,
+            username,
+            full_name,
+            email,
+            role_name,
+            password_hash
         FROM boc_user
-        WHERE username = ?
+        WHERE LOWER(username) = LOWER(?)
           AND is_active = 'Y'
         LIMIT 1
     `;
@@ -99,10 +106,32 @@ app.post("/auth/login", (req, res) => {
         const user = rows[0];
 
         try {
-            const isMatch = await bcrypt.compare(password, user.password_hash);
+            const storedHash = user.password_hash || "";
+            const looksLikeBcrypt = typeof storedHash === "string" && storedHash.indexOf("$2") === 0;
+            let isMatch = false;
+
+            if (looksLikeBcrypt) {
+                isMatch = await bcrypt.compare(password, storedHash);
+            } else {
+                isMatch = password === storedHash;
+            }
 
             if (!isMatch) {
                 return res.status(401).json({ error: "Invalid username or password" });
+            }
+
+            // Keep compatibility with older rows and upgrade plain password values.
+            if (!looksLikeBcrypt) {
+                try {
+                    const newHash = await bcrypt.hash(password, saltRounds);
+                    pool.query(
+                        "UPDATE boc_user SET password_hash = ?, updated_at = ? WHERE user_id = ?",
+                        [newHash, now(), user.user_id],
+                        () => {}
+                    );
+                } catch (rehashErr) {
+                    console.error("Password rehash error:", rehashErr);
+                }
             }
 
             const token = jwt.sign(
@@ -116,16 +145,29 @@ app.post("/auth/login", (req, res) => {
                 { expiresIn: "8h" }
             );
 
+            const userPayload = {
+                user_id: user.user_id,
+                username: user.username,
+                full_name: user.full_name,
+                email: user.email,
+                role_name: user.role_name
+            };
+
+            if (req.session) {
+                req.session.USER_ID = user.user_id;
+                req.session.USERNAME = user.username;
+                req.session.ROLE_NAME = user.role_name || "User";
+            }
+
             return res.json({
                 success: true,
                 token: token,
-                user: {
-                    user_id: user.user_id,
-                    username: user.username,
-                    full_name: user.full_name,
-                    email: user.email,
-                    role_name: user.role_name
-                }
+                user: userPayload,
+                user_id: userPayload.user_id,
+                username: userPayload.username,
+                full_name: userPayload.full_name,
+                email: userPayload.email,
+                role_name: userPayload.role_name
             });
         } catch (compareErr) {
             console.error("Password compare error:", compareErr);

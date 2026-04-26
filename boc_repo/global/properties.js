@@ -1,6 +1,6 @@
-//var request_url = "http://localhost:3002";
+var request_url = "http://localhost:3000";
 
-var request_url = "http://3.110.120.123:3002";
+//var request_url = "http://3.110.120.123:3002";
 
 //var request_url = "http://13.61.24.181:3002";
 

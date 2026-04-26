@@ -1249,7 +1249,7 @@ app.get("/quotation/nextno", (req, res) => {
 
 app.get('/feature/getFeature',(req,res) => {
 
- con.query('SELECT `id`, `feature_name`, `feature_description`, `feature_url`, `display_sequence`, `parent_feature_id`, `icon` FROM features WHERE is_active = "Y"', 
+ pool.query('SELECT `id`, `feature_name`, `feature_description`, `feature_url`, `display_sequence`, `parent_feature_id`, `icon` FROM features WHERE is_active = "Y"', 
 (err, result) => {
         if(err){
             console.log(err)

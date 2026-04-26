@@ -318,7 +318,7 @@ const MASTER_TABLE_CONFIG = {
     },
     mst_bom: {
         pk: "bom_id",
-        searchable: ["bom_code", "bom_name", "version_no", "remarks"]
+        searchable: ["bom_code", "bom_name", "version_no", "material_category", "parent_material_name", "remarks"]
     },
     mst_warehouse: {
         pk: "warehouse_id",
@@ -330,7 +330,7 @@ const MASTER_TABLE_CONFIG = {
     },
     mst_bom_items: {
         pk: "bom_item_id",
-        searchable: ["remarks"]
+        searchable: ["material_category", "child_material_name", "part_code", "remarks"]
     }
 };
 

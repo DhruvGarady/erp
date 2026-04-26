@@ -268,6 +268,12 @@ CREATE TABLE mst_bom (
     is_active VARCHAR(20)
 );
 
+ALTER TABLE mst_bom
+ADD COLUMN material_category_id INT NULL,
+ADD COLUMN material_category VARCHAR(150) NULL,
+ADD COLUMN parent_material_name VARCHAR(150) NULL;
+
+
 CREATE TABLE mst_bom_items (
     bom_item_id INT AUTO_INCREMENT PRIMARY KEY,
     bom_id INT,
@@ -283,6 +289,13 @@ CREATE TABLE mst_bom_items (
     updated_at DATETIME,
     is_active VARCHAR(20)
 );
+
+ALTER TABLE mst_bom_items
+ADD COLUMN material_category_id INT NULL,
+ADD COLUMN material_category VARCHAR(150) NULL,
+ADD COLUMN child_material_name VARCHAR(150) NULL,
+ADD COLUMN part_code VARCHAR(100) NULL;
+
 
 CREATE TABLE mst_warehouse (
     warehouse_id INT AUTO_INCREMENT PRIMARY KEY,

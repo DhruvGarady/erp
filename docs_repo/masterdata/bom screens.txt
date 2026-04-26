@@ -1,0 +1,21 @@
+inside masterdata folder we can create 2 files bominq.html and /scripts/bominq.js  
+
+this should follow the same UI as we have in  vendorinq
+
+Then we can do an bom_add.html and scripts/bom_add.js whoes UI is the same as  customer_add.html
+
+in the add we can have 2 tabs,
+in the first tab we can have details that we need to add to the mst_bom table
+then in the second tab we can have all the details to add to the mst_bom_items table
+
+in the second tab lets have 2 fields, material category (which is material group) and material
+based on the category selected the materials will be filtered and the user can select the material and add.
+
+add, will add the material into a template(we can use the same temaple UI that we are using in the vendorinq page)
+this template will have the following fields:
+
+1. part code. (we can use the part_code attribute for this)  
+2. mateial name (child_material_name) 
+3. quantity (this filed has to be a number which the user can input)
+4. uom (this filed should be a select field of all the UOM comming from uom table)
+5. delte option 

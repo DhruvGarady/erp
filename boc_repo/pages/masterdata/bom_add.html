@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+
+  <title>BOM Add/Edit</title>
+  <link rel="shortcut icon" href="../../global/css/images/images.png">
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../../global/libs/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../../global/css/style_et_1.css">
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+
+  <script src="../../global/libs/jquery/jquery.min.js" type="text/javascript"></script>
+  <script src="../../global/libs/jquery/jquery-ui.js" type="text/javascript"></script>
+  <script src="../../global/libs/bootstrap/bootstrap.min.js" type="text/javascript"></script>
+  <script src="../../global/libs/underscore/underscore.js" type="text/javascript"></script>
+  <script src="../../global/libs/jquery/jquery-validation.js" type="text/javascript"></script>
+  <script src="../../global/libs/jquery/jquery_modal.js" type="text/javascript"></script>
+  <script src="../../global/libs/jquery/xlsx.full.min.js" type="text/javascript"></script>
+  <script src="../../global/global_exp1.js" type="text/javascript"></script>
+  <script src="../../global/properties.js" type="text/javascript"></script>
+
+  <script src="scripts/bom_add.js"></script>
+</head>
+
+<style>
+  body {
+    margin: 0;
+    height: 100%;
+  }
+
+  label {
+    margin-bottom: 0 !important;
+  }
+
+  .btn.dropdown-toggle::after {
+    display: none !important;
+  }
+
+  .bom-line-input,
+  .bom-line-select {
+    width: 100%;
+    min-height: 28px;
+  }
+</style>
+
+<body>
+
+  <nav class="navbar">
+    <div class="container-fluid d-flex justify-content-between align-items-center mainNav">
+      <div class="d-flex align-items-center">
+        <a class="navbar-brand m-0" href="../home.html">
+          <img src="../../global/css/images/logo2.png" alt="Logo" height="40">
+        </a>
+        <i class="material-icons ml-2" style="cursor:pointer;font-size: 28px; color:white;" onclick="collapseMenu()">menu</i>
+      </div>
+
+      <div>
+        <div class="btn-group dropleft">
+          <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" id="userName"></button>
+          <div class="dropdown-menu">
+            <a class="dropdown-item" href="#">Profile</a>
+            <a class="dropdown-item" onclick="functionLogout()">Logout</a>
+          </div>
+          <img src="" id="profilePicture" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="row">
+    <div class="col-sm-2 sideMenuDivCol">
+      <div id="menuContainer" style="overflow-y:auto;">
+        <script type="text/template" id="menuTmpl">
+          <%_.each(parentFeatures, function(item, index){ %>
+            <table class="menuTable" id="menuTable" style="width:100%; overflow-y:auto;">
+              <tr class="menuTr" id="menuTr" title="<%= item.feature_description %>">
+                <td class="menuTd" id="menuTd" width="10%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons"><%= item.icon %></i></td>
+                <td class="menuTd" id="menuTd" width="90%" onclick="linkPage('<%= item.feature_url %>')"><div class="tooltip-wrapper"><%= (item.feature_name) %><div class="tooltip-text"><%= (item.feature_description) %></div></div></td>
+                <% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
+                  <td class="menuTd" id="menuTd" width="1%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons">arrow_drop_down</i></td>
+                <% }%>
+              </tr>
+
+              <% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
+                <%_.each(item.childFeatures, function(oitem, index){ %>
+                  <tr class="menuTr" id="menuTr" title="<%= oitem.feature_description %>">
+                    <td class="submenuTd" id="submenuTd" width="10%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
+                    <td class="submenuTd" id="submenuTd" width="90%" onclick="linkPage('<%= oitem.feature_url %>')"><div class="tooltip-wrapper"><%= oitem.feature_name %><div class="tooltip-text"><%= (oitem.feature_description) %></div></div></td>
+                    <td class="submenuTd" id="submenuTd" width="1%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
+                  </tr>
+                <% }); %>
+              <% }%>
+            </table>
+          <% }); %>
+        </script>
+      </div>
+    </div>
+
+    <div class="col-sm-10 mainDiv">
+      <div class="fullSectionDiv">
+        <table width="100%">
+          <tr>
+            <td width="70%" class="mainTblHdr" id="pageTitle">BOM Information:</td>
+            <td style="text-align:right;">
+              <button onclick="saveBom()" class="searchButton">
+                <span class="material-icons">save</span>
+                <span>Save</span>
+              </button>
+              <button onclick="backToInquiry()" class="searchButton">
+                <span>Back</span>
+              </button>
+            </td>
+          </tr>
+        </table>
+
+        <br>
+        <ul class="nav nav-tabs" id="bomTab" role="tablist">
+          <li class="nav-item"><a class="nav-link active" id="details-tab" data-toggle="tab" href="#details" role="tab">BOM Details</a></li>
+          <li class="nav-item"><a class="nav-link" id="items-tab" data-toggle="tab" href="#items" role="tab">BOM Items</a></li>
+        </ul>
+
+        <div class="tab-content border" id="bomTabContent">
+          <div class="tab-pane fade show active" id="details" role="tabpanel" style="margin:17px;">
+            <table width="100%">
+              <tr>
+                <td width="20%">
+                  <div class="form-group">
+                    BOM Code <span style="color:red;">*</span>
+                    <input type="text" id="bom_code" name="bom_code">
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    BOM Name <span style="color:red;">*</span>
+                    <input type="text" id="bom_name" name="bom_name">
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Material Category <span style="color:red;">*</span>
+                    <select id="material_category_id" name="material_category_id" onchange="onHeaderCategoryChange()"></select>
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Parent Material <span style="color:red;">*</span>
+                    <select id="parent_material_id" name="parent_material_id" onchange="onParentMaterialChange()"></select>
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <div class="form-group">
+                    Version
+                    <input type="text" id="version_no" name="version_no">
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Status
+                    <select id="is_active" name="is_active">
+                      <option value="Y">Active</option>
+                      <option value="N">Inactive</option>
+                    </select>
+                  </div>
+                </td>
+                <td></td>
+                <td colspan="3">
+                  <div class="form-group">
+                    Remarks
+                    <textarea id="remarks" name="remarks" rows="2"></textarea>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="tab-pane fade" id="items" role="tabpanel" style="margin:17px;">
+            <table width="100%">
+              <tr>
+                <td width="25%">
+                  <div class="form-group">
+                    Material Category
+                    <select id="item_material_category_id" name="item_material_category_id" onchange="onItemCategoryChange()"></select>
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="35%">
+                  <div class="form-group">
+                    Material
+                    <select id="child_material_id" name="child_material_id"></select>
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20px" style="vertical-align:middle;">
+                  <input type="button" value="Add" onclick="addBomItem()" class="search">
+                </td>
+                <td></td>
+              </tr>
+            </table>
+
+            <br>
+
+            <div id="bomItemsContainer" class="tempalte">
+              <script type="text/template" id="bomItemsTmpl">
+                <table style="width:100%;" class="dataTbl">
+                  <tr>
+                    <th width="5%">Line</th>
+                    <th width="16%">Part Code</th>
+                    <th width="28%">Material Name</th>
+                    <th width="14%">Quantity</th>
+                    <th width="16%">UOM</th>
+                    <th width="5%" style="text-align:center;">Del</th>
+                  </tr>
+
+                  <% if(!bomItems || bomItems.length === 0){ %>
+                    <tr>
+                      <td colspan="6" style="text-align:center;">No materials added.</td>
+                    </tr>
+                  <% } %>
+
+                  <%_.each(bomItems, function(item, index){ %>
+                    <tr data-index="<%= index %>">
+                      <td><%= index + 1 %></td>
+                      <td>
+                        <input type="text" class="bom-line-input linePartCode" value="<%= item.part_code || '' %>">
+                      </td>
+                      <td><%= item.child_material_name || '' %></td>
+                      <td>
+                        <input type="number" class="bom-line-input lineQty" min="0" step="0.01" value="<%= item.quantity || 1 %>">
+                      </td>
+                      <td>
+                        <select class="bom-line-select lineUom">
+                          <option value="">Select</option>
+                          <%_.each(uoms, function(uom){ %>
+                            <option value="<%= uom.uom_id %>" <%= String(item.uom_id || '') === String(uom.uom_id) ? 'selected' : '' %>><%= uom.uom_code || uom.uom_name || '' %></option>
+                          <% }); %>
+                        </select>
+                      </td>
+                      <td style="text-align:center;" onclick="deleteBomItem(<%= index %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                    </tr>
+                  <% }); %>
+                </table>
+              </script>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>

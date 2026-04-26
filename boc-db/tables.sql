@@ -67,7 +67,33 @@ ADD updated_by VARCHAR(255) DEFAULT 'system';
 
 
 
-
+CREATE TABLE features (
+ id VARCHAR(20) PRIMARY KEY,
+ created_by VARCHAR(50),
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_by VARCHAR(50),
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ feature_name VARCHAR(50),
+ feature_description VARCHAR(50),
+ feature_url VARCHAR(50),
+ display_sequence  INT,
+ parent_feature_id VARCHAR(20),
+ icon VARCHAR(20),
+ is_active VARCHAR(50)
+ );
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR100','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','DASHBOARD','DASHBOARD','home.html','1','','school','Y');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR101','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','USER MANAGEMENT','USER MANAGEMENT','','2','','manage_accounts','Y');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR102','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','USER (Add/Edit/Del)','USER','usermanagementinq.html','1','TR101','','Y');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR103','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','FACULTY & STAFF','FACULTY & STAFF','faculty_managementinq.html','2','TR101','','N');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR107','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','COMMUNICATION AND NOTIFICATION','COMMUNICATION AND NOTIFICATION','','6','','notifications','Y');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR108','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','DISCUSSION','DISCUSSION','discussioninq.html','1','TR107','','N');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR109','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','ALERTS (Add/Del)','ALERTS','email_alertsinq.html','2','TR107','','Y');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR110','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','MASTER DATA','MASTER DATA','','9','','create_new_folder','Y');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR113','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','COURSES','COURSES','coursemasterinq.html','1','TR110','','Y');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR114','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','SECTIONS','SECTIONS','sectiomasterinq.html','2','TR110','','N');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR115','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','CLUBS','CLUBS','clubmasterinq.html','3','TR110','','N');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR116','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','FESTS','FESTS','festmasterinq.html','4','TR110','','N');
+INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR117','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','HOSTEL','HOSTEL','hostelmasterinq.html','5','TR110','','N');
 
 
 

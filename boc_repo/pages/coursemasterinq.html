@@ -28,15 +28,9 @@
    <link rel="stylesheet" href="../_global/libs/jquery/jquery-ui.css">
   <script src="../_global/global_exp1.js" type="text/javascript"></script> 
     <script src="../_global/properties.js" type="text/javascript"></script> 
-    
-    
-    <script src="../_global/libs/charts/chart.min.js" type="text/javascript"></script> 
-<script src="../_global/libs/charts/chartjs-plugin-annotation.js" type="text/javascript"></script> 
-<script src="../_global/libs/charts/chartjs-plugin-datalabels.js" type="text/javascript"></script> 
-                
   
   <!-- Custom JavaScript -->
-  <script src="scripts/home.js" ></script>
+  <script src="scripts/coursemasterinq.js" ></script>
 </head>
 
 
@@ -48,35 +42,6 @@ body{
   .btn.dropdown-toggle::after {
     display: none !important;
   }
-  
-  #js-legend2, #legend3, #legend5, #legend4 {
-    margin-top: 5px;
-    padding: 0;
-    list-style: none;
-}
-
-#js-legend2 ul, #legend3 ul,#legend5 ul, #legend4 ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-#js-legend2 li, #legend3 li, #legend5 li, #legend4 li {
-    display: flex;
-    align-items: center;
-    margin-bottom: 0;
-}
-
-#js-legend2 span, #legend3 span, #legend5 span, #legend6 span, #legend4 span{
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    margin-right: 10px;
-}
-  
 </style>
 
 <body>
@@ -101,7 +66,6 @@ body{
           <a class="dropdown-item" href="#">Profile</a>
           <a class="dropdown-item" onclick="functionLogout()">Logout</a>
         </div>
-		<img src="" id="profilePicture" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
       </div>
     </div>
   
@@ -109,11 +73,10 @@ body{
 </nav>
 
 
-
   
   <div class="row" >
     
-    <div class="col-sm-2 sideMenuDivCol">
+    <div class="col-sm-2 sideMenuDivCol ">
    
   <div id="menuContainer" style="overflow-y:auto;">
 	<script type="text/template" id="menuTmpl">
@@ -150,159 +113,115 @@ body{
     
     <div class="col-sm-10 mainDiv">
     
-    <div class="d-flex justify-content-between">
- 
+    
  
  <div class="sectionDiv">   
  
  		<table width="98%">
 			<tr>
-				<td class="mainTblHdr">User Information:</td> 
+				<td class="mainTblHdr">User Management:</td> 
 			</tr>
 		</table>
-
  
-		<table width="98%" class="border pl-2">
-			<tr class="border pl-2">
-				<td width="20%">	
-					<b>Total Users:</b>
-				</td>		
-				
-				<td width="2%"></td>						
-
-				<td width="20%">	
-					<span id="totUsers"></span>
-				</td>		
-			</tr>	
-			
-			<tr>
-				<td colspan="3">	
-				</td>		
-			</tr>		
-
-			<tr class="border pl-2">
-				<td width="20%">	
-					<b>Total Students:</b>
-				</td>		
-				
-				<td width="2%"></td>						
-
-				<td width="20%">	
-					<span id="totStudents"></span>
-				</td>		
-			</tr>	
-
-			<tr>
-				<td colspan="3">	
-				</td>		
-			</tr>
-
-			<tr class="border pl-2">
-				<td width="20%">	
-					<b>Total Faculty:</b>
-				</td>		
-				
-				<td width="2%"></td>						
-
-				<td width="20%">	
-					<span id="totfaculty"></span>
-				</td>		
-			</tr>	
-
-			<tr>
-				<td colspan="3">	
-				</td>		
-			</tr>			
-			
-			<tr class="border pl-2">
-				<td width="20%">	
-					<b>Total Staff:</b>
-				</td>		
-				
-				<td width="2%"></td>						
-
-				<td width="20%">	
-					<span id="totStaff"></span>
-				</td>		
-			</tr>				
-
-		</table>    
-		<div style="height:350px">
-	    	<div id = "js-legend2" class="pt-4 pb-1"></div>
-	    	<canvas id="ProductionMachineChart" width="350" height="300"></canvas>
+		<table width="50%">
+	
+	<tr>
+		<td width="20%">	
+		<div class="">
+			<label class="form-group">User Type:</label>
+			<select id="userType" name="userType" style="width:100%">
+			  <option value="">Select</option>
+			  <option value="PRINCIPAL">PRINCIPAL</option>
+			  <option value="VP">VP</option>
+			  <option value="HOD">HOD</option>
+			  <option value="TEACHER">TEACHER</option>
+			  <option value="STAFF">STAFF</option>
+			  <option value="STUDENT">STUDENT</option>
+			</select>		  
+		  
 		</div>
+		</td>
+	
+		<td width="2%"></td>
+		
+		<td width="20%">	
+		<div class="">
+			<label class="form-group">Section:</label>
+			<select id="Section" name="Section" style="width:100%">
+			  <option value="">Select</option>
+			  <option value="PRINCIPAL">PRINCIPAL</option>
+			  <option value="VP">VP</option>
+			  <option value="HOD">HOD</option>
+			  <option value="TEACHER">TEACHER</option>
+			  <option value="STAFF">STAFF</option>
+			  <option value="STUDENT">STUDENT</option>
+			</select>		  
+		  
+		</div>
+
+		</td>	
+			
+		<td width="2%"></td>
+		
+		<td width="20px" style="vertical-align:bottom;">	
+			<input type="button" value="Search" onclick="search()" class="search">	  
+
+		</td>			
+	
+	</tr>	
+		</table>    
+    
     
     </div>		
 		
-     <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-    </div>		
-   	
+		
+		<br>
 	
 
-  <div class="sectionDiv">   
- 
- 		<table width="98%">
+ <div class="sectionDiv" style="height:75%;">   	 
+	  
+	  
+	  <div id="listContainer2" class="tempalte">
+		<script type="text/template" id="listTmpl">
+
+		<table style="width:100%;" class="dataTbl">
+			  <tr>
+				<th width="3%">Roll Number</th>
+				<th width="5%">First Name</th>
+				<th width="5%">Last Name</th>
+				<th width="3%">Class Section</th>
+				<th width="7%">Course</th>
+				<th width="4%">Attendace %</th>
+				<th width="4%">Tuition Status</th>
+				<th width="2%">Edit</th>
+				<th width="1%" style="text-align:center;">Del</th>
+			  </tr>	
+        
+	<%
+_.each(usrData, function(item){ %>
 			<tr>
-				<td class="mainTblHdr">Student Enrolled By Semester:</td> 
+				<td><%= item.roll_num %></td>
+				<td><%= item.first_name %></td>
+				<td><%= item.last_name %></td>
+				<td><%= item.class_section %></td>
+				<td><%= item.course %></td>
+				<td><%= item.attendance_percentage %></td>
+				<td><%= item.tuition_status %></td>
+				<td onclick="editUsr(<%= item.id %>)" ><i class="material-icons">edit</i></td>
+				<td style="text-align:center;"><i class="material-icons"><input type="button" value="Del" onclick="deleteUsr(<%= item.id %>)" class="deleteBtn"></td>
 			</tr>
-		</table>
- 
-				<div style="height:300px">
-	    	<div id = "legend3" class="pt-4"></div>
-	    	<canvas id="ProductionEffiChart" width="300" height="300"></canvas>
-		</div>  
-    
-    
-    </div>	
-    
-    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-    </div>		
-   
-    
-     <div class="sectionDiv">   
- 
- 		<table width="98%">
-			<tr>
-				<td class="mainTblHdr">Alerts:</td> 
-			</tr>
-		</table>
- 
-		<div id="listContainer2" class="tempalte" style="height: 90%;">
-			<script type="text/template" id="listTmpl">
+       
+	<% }); %>
+	</table>
+    </script>
+	</div>				
 	
-			<table style="width:100%;" class="dataTbl">
-				  <tr>
-					<th width="70%">Message</th>
-					<th width="30%">Status</th>
-				  </tr>	
-			
-		<%_.each(usrData, function(item){ %>
-				<tr>
-					<td><%= item.alert_message %></td>
-					
-					<td>
-						<select class="statusSelect" data-id="<%= item.id %>" id="status-<%= item.id %>" value="<%= item.status %>" onchange="changeAlertStatus('<%= item.id %>')">
-							<%_.each(section.details, function(item){ %>
-							  <option value="<%= item.value1%>"><%= item.value1%></option>	
-							<% }); %>	
-							</select>	
-					</td>
-				
-				</tr>
-		   
-		<% }); %>
-		</table>
-		</script>
-		</div>  
+	
     
     
     </div>	
-    
-    <div>&nbsp;&nbsp;&nbsp;&nbsp;
-    </div>		
-   
   
-  </div>
+  
   </div>
 </div>
 

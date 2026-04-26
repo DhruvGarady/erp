@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+  
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+
+  <title>LMS</title>
+  <link rel="shortcut icon" href="../_global/css/images/images.png">
+  
+  <!-- CSS Files -->
+   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../_global/libs/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../_global/css/style_et_1.css">
+
+
+  <!-- JavaScript Files -->
+ <script src="../_global/libs/jquery/jquery.min.js" type="text/javascript"></script> <!-- jQuery must load first -->
+  <script src="../_global/libs/jquery/jquery-ui.js" type="text/javascript"></script> <!-- jQuery UI -->
+  <script src="../_global/libs/bootstrap/bootstrap.min.js" type="text/javascript"></script> <!-- Bootstrap JS -->
+  <script src="../_global/libs/underscore/underscore.js" type="text/javascript"></script> <!-- Underscore JS -->
+  <script src="../_global/libs/jquery/jquery-validation.js" type="text/javascript"></script> 
+   <script src="../_global/libs/jquery/jquery_modal.js" type="text/javascript"></script>
+    <script src="../_global/libs/jquery/xlsx.full.min.js" type="text/javascript"></script>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <script src="../_global/global_exp1.js" type="text/javascript"></script> 
+    <script src="../_global/properties.js" type="text/javascript"></script> 
+  
+  <!-- Custom JavaScript -->
+  <script src="scripts/edit_user.js" ></script>
+</head>
+
+
+<style>
+body{
+    margin: 0; /* Ensure no default margin */
+    height: 100%; /* Ensure the body takes full height of the screen */
+}
+ 
+label {
+	margin-bottom: none !important;
+}
+ 
+ /*  .btn.dropdown-toggle::after {
+    display: none !important;
+  }
+  
+  
+    form {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4u0px;
+    max-width: 100%;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 10px;
+  }
+
+  .form-row {
+    display: contents; 
+  }
+
+  button[type="submit"] {
+    grid-column: span 4;
+    padding: 10px 15px;
+    font-size: 16px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+
+  button[type="submit"]:hover {
+    background-color: #0056b3;
+  }
+
+  select, input, textarea {
+    padding: 5px;
+    font-size: 14px;
+  }
+  label{
+  	margin-bottom: none !important;
+  } */
+</style>
+
+<body>
+					
+<nav class="navbar">
+  <div class="container-fluid d-flex justify-content-between align-items-center mainNav">
+    
+    <!-- Left: Logo + Menu -->
+    <div class="d-flex align-items-center">
+      <a class="navbar-brand m-0" href="home.html">
+        <img src="../_global/css/images/logo2.png" alt="Logo" height="40">
+      </a>
+      <i class="material-icons ml-2" style="cursor:pointer;font-size: 28px; color:white;" onclick="collapseMenu()">menu</i>
+    </div>
+    
+    <!-- Right: User Dropdown -->
+    <div>
+      <div class="btn-group dropleft">
+        <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" id="userName">
+        </button>
+        <div class="dropdown-menu">
+          <a class="dropdown-item" href="#">Profile</a>
+          <a class="dropdown-item" onclick="functionLogout()">Logout</a>
+        </div>
+        <img src="" id="profilePicture" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
+      </div>
+    </div>
+  
+  </div>
+</nav>
+
+
+  
+  <div class="row" >
+    
+    <div class="col-sm-2 sideMenuDivCol ">
+   
+  <div id="menuContainer" style="overflow-y:auto;">
+	<script type="text/template" id="menuTmpl">
+        
+	<%_.each(parentFeatures, function(item, index){ %>
+
+             <table class="menuTable" id="menuTable" style="width:100%; overflow-y:auto;">
+				<tr class="menuTr" id="menuTr" title="<%= item.feature_description %>">
+ 					<td class="menuTd" id="menuTd" width="10%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons"><%= item.icon %></i></td>
+                    <td class="menuTd" id="menuTd" width="90%" onclick="linkPage('<%= item.feature_url %>')"><div class="tooltip-wrapper"><%= (item.feature_name) %><div class="tooltip-text"><%= (item.feature_description) %></div></div></td>
+				<% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
+					<td class="menuTd" id="menuTd" width="1%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons">arrow_drop_down</i></td>
+                <% }%>
+				</tr>
+
+				<% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
+					<%_.each(item.childFeatures, function(oitem, index){ %>
+					<tr class="menuTr" id="menuTr" title="<%= oitem.feature_description %>">
+						<td class="submenuTd" id="submenuTd" width="10%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
+                    	<td class="submenuTd" id="submenuTd" width="90%" onclick="linkPage('<%= oitem.feature_url %>')"><div class="tooltip-wrapper"><%= oitem.feature_name %><div class="tooltip-text"><%= (oitem.feature_description) %></div></div></td>
+						<td class="submenuTd" id="submenuTd" width="1%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
+					</tr>	       	
+				      <% }); %>	
+				<% }%>
+
+			</table>
+       
+	<% }); %>
+       
+    </script>
+</div> 
+
+    </div>
+    
+    
+    <div class="col-sm-10 mainDiv">
+    
+    
+ 
+ <div class="fullSectionDiv">  
+<table width="100%">
+	<tr>
+		<td width="80%" class="mainTblHdr">
+			User Information:
+		</td>
+		
+		<td style="text-align:right;">
+			<button onclick="save()" class="searchButton">
+			  <span class="material-icons">save</span>
+			  <span>Save</span>
+			</button>
+
+		</td>
+	</tr>
+</table>
+ 
+ <br>
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+  <li class="nav-item"><a class="nav-link active" id="home-tab" data-toggle="tab" href="#home" role="tab">Basic</a></li>
+  <li class="nav-item"><a class="nav-link" id="contact-tab" data-toggle="tab" href="#contact" role="tab">Contact</a></li>
+  <li class="nav-item"><a class="nav-link" id="address-tab" data-toggle="tab" href="#address" role="tab">Address</a></li>
+  <li class="nav-item"><a class="nav-link" id="guardian-tab" data-toggle="tab" href="#guardian" role="tab">Guardian</a></li>
+  <li class="nav-item"><a class="nav-link" id="profile-tab" data-toggle="tab" href="#profile" role="tab">Profile</a></li>
+  <li class="nav-item"><a class="nav-link" id="course-tab" data-toggle="tab" href="#course" role="tab">Course</a></li>
+</ul>
+
+<div class="tab-content border" id="myTabContent">
+
+ <!-- BASIC DETAILS -->
+<div class="tab-pane fade show active" id="home" role="tabpanel" style="margin:17px;">
+  <table width="100%">
+    <tr>
+      <td width="20%">
+        <div class="form-group">
+          First Name <span style="color:red;">*</span><input type="text" name="first_name" id="first_name" >
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Last Name <span style="color:red;">*</span><input type="text" name="last_name" id="last_name" >
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Roll Number <span style="color:red;">*</span><input type="text" name="roll_num" id="roll_num" >
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Grade Level <input type="text" name="grade_level" id="grade_level">
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div class="form-group">
+          Date of Birth <input type="text" id="date_of_birth" name="date_of_birth">
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Gender
+          <select name="gender" id="gender">
+            <option value="">Select</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          User Type <span style="color:red;">*</span>
+          <select id="userType" name="userType">
+            <script id="userTypeTmpl" type="text/template"> 
+              <%_.each(userType.details, function(item){ %>
+                <option value="<%= item.value1%>"><%= item.value1%></option>									
+              <% }); %>
+            </script> 
+          </select>
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Nationality <input type="text" name="nationality" id="nationality">
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align:top;">
+        <div class="form-group">
+          Blood Type 
+          <select name="blood_type" id="blood_type" >
+            <option value="">-- Select Blood Type --</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+          </select>
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Medical Conditions <br>
+          <textarea name="medical_conditions" id="medical_conditions" rows="2"></textarea>
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Last Login <input type="datetime-local" name="last_login" id="last_login">
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Account Status
+          <select name="account_status" id="account_status">
+            <option>Active</option>
+            <option>Suspended</option>
+            <option>Pending</option>
+          </select>
+        </div>
+      </td>      
+    </tr>
+ 
+     <tr>
+      <td width="20%">
+        <div class="form-group">
+          Username <span style="color:red;">*</span><input type="text" name="username" id="username" >
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Password <span style="color:red;">*</span><input type="password" name="password_hash" id="password_hash" >
+        </div>
+      </td>
+    </tr>
+    <tr>   
+    
+  </table>
+</div>
+
+<!-- CONTACT DETAILS -->
+<div class="tab-pane fade" id="contact" role="tabpanel" style="margin:17px;">
+  <table width="100%">
+    <tr>
+      <td width="20%">
+        <div class="form-group">
+          Email <input type="email" name="email" id="email" >
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Phone <input type="tel" name="phone" id="phone">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Emergency Contact Name <input type="text" name="emergency_contact_name" id="emergency_contact_name">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Emergency Contact Phone <input type="tel" name="emergency_contact_phone" id="emergency_contact_phone">
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- ADDRESS DETAILS -->
+<div class="tab-pane fade" id="address" role="tabpanel" style="margin:17px;">
+  <table width="100%">
+    <tr>
+      <td width="20%">
+        <div class="form-group">
+          Address <textarea name="address" id="address"></textarea>
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          State 
+          <select id="state" name="state">
+            <script id="stateTmpl" type="text/template"> 
+              <option value="">-- Select State --</option>
+              <%_.each(state.details, function(item){ %>
+                <option value="<%= item.value1%>"><%= item.value1%></option>									
+              <% }); %>
+            </script> 
+          </select>
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Country <input type="text" name="country" id="country">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Pincode <input type="text" name="pincode" id="pincode">
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- GUARDIAN DETAILS -->
+<div class="tab-pane fade" id="guardian" role="tabpanel" style="margin:17px;">
+  <table width="100%">
+    <tr>
+      <td width="20%">
+        <div class="form-group">
+          Guardian Name <input type="text" name="guardian_name" id="guardian_name">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Guardian Phone <input type="tel" name="guardian_phone" id="guardian_phone">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Guardian Email <input type="email" name="guardian_email" id="guardian_email">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="20%">
+        <div class="form-group">
+          Relationship <input type="text" name="relationship" id="relationship">
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<!-- PROFILE DETAILS -->
+<div class="tab-pane fade" id="profile" role="tabpanel" style="margin:17px;">
+  <table width="100%">
+    <tr>
+      <td width="25%">
+        <div class="form-group">
+          GPA <input type="number" name="GPA" id="GPA" step="0.01">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="25%">
+        <div class="form-group">
+          Attendance Percentage <input type="number" name="attendance_percentage" id="attendance_percentage" step="0.01">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="25%">
+        <div class="form-group">
+          Academic Status <input type="text" name="academic_status" id="academic_status">
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div class="form-group">
+          Disciplinary Record <textarea name="disciplinary_record" id="disciplinary_record" rows="2"></textarea>
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Clubs and Activities <textarea name="clubs_and_activities" id="clubs_and_activities" rows="2"></textarea>
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Sports Participation <textarea name="sports_participation" id="sports_participation" rows="2"></textarea>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div class="form-group">
+          Volunteer Hours <input type="number" name="volunteer_hours" id="volunteer_hours">
+        </div>
+      </td>
+      <td></td>
+      <td width="25%">
+        <div class="form-group">
+          Class Section 
+          <select id="classSection" name="classSection">
+            <script id="classSectionTmpl" type="text/template"> 
+              <option value="">-- Select Section --</option>
+              <%_.each(section.details, function(item){ %>
+                <option value="<%= item.value1%>"><%= item.value1%></option>									
+              <% }); %>
+            </script> 
+          </select>
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Profile Picture <input type="file" name="profile_picture" id="profile_picture">
+        </div>
+      </td>
+
+
+    </tr>
+  </table>
+</div>
+
+<!-- COURSE DETAILS -->
+<div class="tab-pane fade" id="course" role="tabpanel" style="margin:17px;">
+  <table width="100%">
+    <tr>
+      <td width="25%">
+        <div class="form-group">
+          Course <input type="text" name="course" id="course">
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="25%">
+        <div class="form-group">
+          Courses Enrolled <textarea name="courses_enrolled" id="courses_enrolled" rows="2"></textarea>
+        </div>
+      </td>
+      <td width="5%"></td>
+      <td width="25%">
+        <div class="form-group">
+          Credits Earned <input type="number" name="credits_earned" id="credits_earned">
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div class="form-group">
+          Semester
+          <select id="semester" name="semester">
+            <script id="semesterTmpl" type="text/template"> 
+              <option value="">-- Select Semester --</option>
+              <%_.each(semester.details, function(item){ %>
+                <option value="<%= item.value1%>"><%= item.value1%></option>									
+              <% }); %>
+            </script> 
+          </select>
+        </div>
+      </td>
+      <td></td>
+      <td>
+        <div class="form-group">
+          Tuition Status
+          <select name="tuition_status" id="tuition_status">
+            <option>Paid</option>
+            <option>Unpaid</option>
+            <option>Partial</option>
+          </select>
+        </div>
+      </td>
+      <td></td>
+      <td width="25%">
+        <div class="form-group">
+          Admission Date <input type="text" id="admission_date" name="admission_date">
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+</div>
+
+
+    
+    </div>	
+  
+  
+  </div>
+</div>
+
+
+  </body>
+
+  </html>

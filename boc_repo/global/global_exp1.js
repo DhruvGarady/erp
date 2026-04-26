@@ -53,16 +53,16 @@ function userLogin() {
 	var id = sessionStorage.getItem("USER_ID")
 	if(id != null && id != "" && id != undefined){
 			alert("User already logged in!");
-			location.href = "_webpages/home.html"
+			location.href = "pages/home.html"
 		}else{
 	
 				var jsonData ={
 			        username: $("#username").val(),
-			        password_hash: $("#password").val()
+			        password: $("#password").val()
 			    }
 	
 				
-			  postURL = request_url + "/user/login";
+			  postURL = request_url + "/auth/login";
 				
 			    $.ajax({
 			        type: "POST",
@@ -86,16 +86,23 @@ function userLogin() {
 }
 
 function onUserLoginSuccess(response) {
-		//alert("Login Successful.")
-	    sessionStorage.setItem("USER_ID", response.user_id);
-		sessionStorage.setItem("USERNAME",response.username);
-		sessionStorage.setItem("PROFILE_PICTURE", response.profile_picture || "https://lms-imgs.s3.ap-south-1.amazonaws.com/default-profilepic.jpg");
+	var user = response && response.user ? response.user : response;
+	sessionStorage.setItem("TOKEN", response && response.token ? response.token : "");
+	sessionStorage.setItem("USER_ID", user && user.user_id ? user.user_id : "");
+	sessionStorage.setItem("USERNAME", user && user.username ? user.username : "");
+	sessionStorage.setItem("FULL_NAME", user && user.full_name ? user.full_name : (user && user.username ? user.username : ""));
+	sessionStorage.setItem("ROLE_NAME", user && user.role_name ? user.role_name : "User");
+	sessionStorage.setItem("PROFILE_PICTURE", response.profile_picture || "https://lms-imgs.s3.ap-south-1.amazonaws.com/default-profilepic.jpg");
 
-		location.href = "_webpages/home.html";
+	location.href = "pages/home.html";
 }
 
-function onUserLoginErr(){
-	showWarningDialog("Invalid username or password. Please try again.");
+function onUserLoginErr(xhr){
+	var message = "Invalid username or password. Please try again.";
+	if (xhr && xhr.responseJSON && xhr.responseJSON.error) {
+		message = xhr.responseJSON.error;
+	}
+	showWarningDialog(message);
 	$(".loader").addClass("hide");
 	$(".wrapper").addClass("hide");
 }

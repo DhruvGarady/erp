@@ -176,7 +176,7 @@ app.post("/auth/login", (req, res) => {
     });
 });
 
-app.post("/auth/create-user", async (req, res) => {
+app.post("/auth/create-user", verifyToken, async (req, res) => {
     const {
         employee_code,
         full_name,
@@ -872,7 +872,7 @@ function now() {
 // 1. GET /quotation/list
 //    Returns all active quotations (summary list)
 // ==================================================================
-app.get("/quotation/list", (req, res) => {
+app.get("/quotation/list", verifyToken, (req, res) => {
     const sql = `
         SELECT 
             quotation_id,
@@ -906,7 +906,7 @@ app.get("/quotation/list", (req, res) => {
 // 2. GET /quotation/:id
 //    Returns full quotation header + items
 // ==================================================================
-app.get("/quotation/:id", (req, res) => {
+app.get("/quotation/:id", verifyToken, (req, res) => {
     const quotationId = req.params.id;
 
     const headerSql = `SELECT * FROM quotations WHERE quotation_id = ?`;
@@ -940,7 +940,7 @@ app.get("/quotation/:id", (req, res) => {
 //    Creates quotation header + items in a transaction
 //    Body: { header: {...}, items: [...] }
 // ==================================================================
-app.post("/quotation/create", (req, res) => {
+app.post("/quotation/create", verifyToken, (req, res) => {
     const { header, items } = req.body;
     const dateNow = now();
 
@@ -1063,7 +1063,7 @@ app.post("/quotation/create", (req, res) => {
 //    Updates header, soft-deletes old items, inserts fresh items
 //    Body: { header: {...}, items: [...] }
 // ==================================================================
-app.put("/quotation/update/:id", (req, res) => {
+app.put("/quotation/update/:id", verifyToken, (req, res) => {
     const quotationId = req.params.id;
     const { header, items } = req.body;
     const dateNow = now();
@@ -1207,7 +1207,7 @@ app.put("/quotation/update/:id", (req, res) => {
 //    Updates only the status field (Draft > Sent > Approved/Rejected)
 //    Body: { status: "Sent", updated_by: 1 }
 // ==================================================================
-app.patch("/quotation/status/:id", (req, res) => {
+app.patch("/quotation/status/:id", verifyToken, (req, res) => {
     const quotationId = req.params.id;
     const { status, updated_by } = req.body;
     const dateNow = now();
@@ -1236,7 +1236,7 @@ app.patch("/quotation/status/:id", (req, res) => {
 //    Soft delete — sets is_active = 'N' on header (items stay)
 //    Body: { updated_by: 1 }
 // ==================================================================
-app.delete("/quotation/:id", (req, res) => {
+app.delete("/quotation/:id", verifyToken, (req, res) => {
     const quotationId = req.params.id;
     const { updated_by } = req.body;
     const dateNow = now();
@@ -1264,7 +1264,7 @@ app.delete("/quotation/:id", (req, res) => {
 // 7. GET /quotation/nextno
 //    Returns the next quotation number e.g. QT-0001
 // ==================================================================
-app.get("/quotation/nextno", (req, res) => {
+app.get("/quotation/nextno", verifyToken, (req, res) => {
     const sql = `SELECT quotation_no FROM quotations ORDER BY quotation_id DESC LIMIT 1`;
 
     pool.query(sql, (err, rows) => {
@@ -1289,7 +1289,7 @@ app.get("/quotation/nextno", (req, res) => {
 });
 //-----------------------------------------quotation end ----------------------------------------------
 
-app.get('/feature/getFeature',(req,res) => {
+app.get('/feature/getFeature', verifyToken, (req,res) => {
 
  pool.query('SELECT `id`, `feature_name`, `feature_description`, `feature_url`, `display_sequence`, `parent_feature_id`, `icon` FROM features WHERE is_active = "Y"', 
 (err, result) => {

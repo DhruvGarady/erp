@@ -182,7 +182,7 @@ function setUsrName(){
 function functionLogout(){
 	sessionStorage.clear();
 	localStorage.clear();
-	location.href = "../index.html"
+	location.href = "/boc_repo/index.html"
 }
 
 

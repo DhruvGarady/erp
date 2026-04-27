@@ -72,8 +72,38 @@ function onSearchErr(xhr) {
 }
 
 function renderList() {
-  $("#listContainer2").html(_.template(customerTemplate, { customers: customers || [] }));
+  var filteredCustomers = getFilteredCustomers();
+  $("#listContainer2").html(_.template(customerTemplate, { customers: filteredCustomers || [] }));
   $("#listContainer2").trigger("create");
+}
+
+function filterCustomerTable() {
+  renderList();
+}
+
+function getFilteredCustomers() {
+  var searchText = $.trim($("#customerTableSearch").val() || "").toLowerCase();
+
+  if (!searchText) {
+    return customers || [];
+  }
+
+  return _.filter(customers || [], function (item) {
+    var rowText = [
+      item.customer_code,
+      item.customer_name,
+      item.customer_type,
+      item.contact_person,
+      item.phone,
+      item.email,
+      item.gst_no,
+      item.city,
+      item.state,
+      item.is_active === "N" ? "Inactive" : "Active"
+    ].join(" ").toLowerCase();
+
+    return rowText.indexOf(searchText) !== -1;
+  });
 }
 
 function addCustomer() {

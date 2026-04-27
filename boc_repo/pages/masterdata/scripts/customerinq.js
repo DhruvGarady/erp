@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   customerTemplate = $("#listTmpl").html();
   customers = [];
+  $("#customerTableSearch").on("input", filterCustomerTable);
   renderList();
   search();
 });
@@ -72,37 +73,23 @@ function onSearchErr(xhr) {
 }
 
 function renderList() {
-  var filteredCustomers = getFilteredCustomers();
-  $("#listContainer2").html(_.template(customerTemplate, { customers: filteredCustomers || [] }));
+  $("#listContainer2").html(_.template(customerTemplate, { customers: customers || [] }));
+  filterCustomerTable();
   $("#listContainer2").trigger("create");
 }
 
 function filterCustomerTable() {
-  renderList();
-}
-
-function getFilteredCustomers() {
   var searchText = $.trim($("#customerTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
 
   if (!searchText) {
-    return customers || [];
+    rows.show();
+    return;
   }
 
-  return _.filter(customers || [], function (item) {
-    var rowText = [
-      item.customer_code,
-      item.customer_name,
-      item.customer_type,
-      item.contact_person,
-      item.phone,
-      item.email,
-      item.gst_no,
-      item.city,
-      item.state,
-      item.is_active === "N" ? "Inactive" : "Active"
-    ].join(" ").toLowerCase();
-
-    return rowText.indexOf(searchText) !== -1;
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
   });
 }
 

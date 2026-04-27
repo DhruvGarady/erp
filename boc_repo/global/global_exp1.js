@@ -92,9 +92,66 @@ function onUserLoginSuccess(response) {
 	sessionStorage.setItem("USERNAME", user && user.username ? user.username : "");
 	sessionStorage.setItem("FULL_NAME", user && user.full_name ? user.full_name : (user && user.username ? user.username : ""));
 	sessionStorage.setItem("ROLE_NAME", user && user.role_name ? user.role_name : "User");
-	sessionStorage.setItem("PROFILE_PICTURE", response.profile_picture || "https://lms-imgs.s3.ap-south-1.amazonaws.com/default-profilepic.jpg");
+	sessionStorage.setItem("PROFILE_PICTURE", response && response.profile_picture ? response.profile_picture : "https://lms-imgs.s3.ap-south-1.amazonaws.com/default-profilepic.jpg");
 
-	location.href = "pages/home.html";
+	loadLoginFeatures();
+}
+
+function loadLoginFeatures() {
+	$.ajax({
+		type: "GET",
+		url: request_url + "/feature/getFeature",
+		headers: getAuthHeaders(),
+		contentType: "application/json",
+		success: function(features) {
+			if (!Array.isArray(features)) {
+				showWarningDialog("Menu features were not returned correctly. Please login again.");
+				return;
+			}
+
+			parentFeatures = buildFeatureTree(features);
+			sessionStorage.setItem("FEATURES", JSON.stringify(parentFeatures));
+			location.href = "pages/home.html";
+		},
+		error: function(xhr) {
+			var message = "Unable to load menu features. Please login again.";
+			if (xhr && xhr.responseJSON && xhr.responseJSON.error) {
+				message = xhr.responseJSON.error;
+			}
+			showWarningDialog(message);
+		}
+	});
+}
+
+function buildFeatureTree(features) {
+	_.each(features, function(item){
+		item.feature_name = (item.feature_name || "").toLowerCase();
+		
+		if(item.parent_feature_id != null && item.parent_feature_id != undefined && item.parent_feature_id != ""){
+			item.isParentFeature = 'N';	
+		}else{
+			item.isParentFeature = 'Y';
+			item.childFeatures = [];
+		}
+	});
+
+	var childFeatures = _.reject(features, function(item){
+		return item.isParentFeature == 'Y';
+	});
+
+	var parentFeatureList = _.reject(features, function(item){
+		return item.isParentFeature == 'N';
+	});
+
+	_.each(parentFeatureList, function(pitem){
+		_.each(childFeatures, function(citem){
+			if(pitem.id == citem.parent_feature_id){
+				pitem.childFeatures.push(citem);
+			}
+		});
+	});
+
+	return parentFeatureList;
 }
 
 function onUserLoginErr(xhr){
@@ -116,6 +173,14 @@ function userLogout(){
 //-------------------------------LOGIN END----------------------------------------
 
 
+function getAuthHeaders(){
+	var token = sessionStorage.getItem("TOKEN");
+	if (!token) {
+		return {};
+	}
+	return { Authorization: "Bearer " + token };
+}
+
 function getAPIdata(strURL){
 	
 return JSON.parse($.ajax({
@@ -123,6 +188,7 @@ return JSON.parse($.ajax({
 		async:false,
 	    type: "GET",
 	    url: strURL,
+		headers: getAuthHeaders(),
 	    contentType: "application/json",
 		success: function(data) {
 		   return data;
@@ -141,6 +207,7 @@ function getJSONData(strURL) {
   return $.ajax({
     type: "GET",
     url: strURL,
+	headers: getAuthHeaders(),
     contentType: "application/json",
   })
   .then(function(data) {

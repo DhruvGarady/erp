@@ -403,6 +403,15 @@ label {
 	color:black;
 }
 
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-link.active.show,
+.nav-tabs .nav-item.show .nav-link {
+	color: #fff !important;
+	background-color: #1a73e8 !important;
+	border-color: #1a73e8 #1a73e8 #fff !important;
+	font-weight: 700;
+}
+
 .nav-tabs .nav-link:focus,
 .nav-tabs .nav-link:hover {
     outline: none;

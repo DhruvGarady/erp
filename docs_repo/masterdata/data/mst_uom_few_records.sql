@@ -1,0 +1,17 @@
+INSERT INTO mst_uom (uom_code, uom_name, description, created_by, updated_by, created_at, updated_at, is_active) VALUES
+('EA', 'Each', 'Single unit item', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('PCS', 'Pieces', 'Countable pieces', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('BOX', 'Box', 'Packaged box', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('PKT', 'Packet', 'Small packet', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('BAG', 'Bag', 'Bag of material', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('SET', 'Set', 'Set of items', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('PAIR', 'Pair', 'Two items together', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('KG', 'Kilogram', 'Weight unit', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('GM', 'Gram', 'Weight unit', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('LTR', 'Litre', 'Volume unit', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('ML', 'Millilitre', 'Small volume unit', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('MTR', 'Meter', 'Length unit', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('CM', 'Centimeter', 'Length unit', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('ROLL', 'Roll', 'Rolled material', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('MT', 'Metric Ton', 'Bulk weight unit', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y'),
+('NOS', 'Nos', 'Number of items', 'admin', 'admin', '2026-04-27 00:00:00', '2026-04-27 00:00:00', 'Y');

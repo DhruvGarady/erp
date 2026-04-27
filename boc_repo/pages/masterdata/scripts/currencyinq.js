@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   currencyTemplate = $("#listTmpl").html();
   currencies = [];
+  $("#currencyTableSearch").on("input", filterCurrencyTable);
   renderList();
   search();
 });
@@ -73,7 +74,23 @@ function onSearchErr(xhr) {
 
 function renderList() {
   $("#listContainer2").html(_.template(currencyTemplate, { currencies: currencies || [] }));
+  filterCurrencyTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterCurrencyTable() {
+  var searchText = $.trim($("#currencyTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function addCurrency() {

@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   paymentTermsTemplate = $("#listTmpl").html();
   paymentTerms = [];
+  $("#paymentTermsTableSearch").on("input", filterPaymentTermsTable);
   renderList();
   search();
 });
@@ -73,7 +74,23 @@ function onSearchErr(xhr) {
 
 function renderList() {
   $("#listContainer2").html(_.template(paymentTermsTemplate, { paymentTerms: paymentTerms || [] }));
+  filterPaymentTermsTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterPaymentTermsTable() {
+  var searchText = $.trim($("#paymentTermsTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function addPaymentTerms() {

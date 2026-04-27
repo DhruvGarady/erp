@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   taxTemplate = $("#listTmpl").html();
   taxes = [];
+  $("#taxTableSearch").on("input", filterTaxTable);
   renderList();
   search();
 });
@@ -73,7 +74,23 @@ function onSearchErr(xhr) {
 
 function renderList() {
   $("#listContainer2").html(_.template(taxTemplate, { taxes: taxes || [] }));
+  filterTaxTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterTaxTable() {
+  var searchText = $.trim($("#taxTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function addTax() {

@@ -10,6 +10,7 @@ $(document).ready(function () {
 
   materialTemplate = $("#listTmpl").html();
   materials = [];
+  $("#materialTableSearch").on("input", filterMaterialTable);
   renderList();
 
   loadLookups()
@@ -137,7 +138,23 @@ function renderList() {
     groupName: groupName,
     uomName: uomName
   }));
+  filterMaterialTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterMaterialTable() {
+  var searchText = $.trim($("#materialTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function addMaterial() {

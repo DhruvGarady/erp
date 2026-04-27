@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   vendorTemplate = $("#listTmpl").html();
   vendors = [];
+  $("#vendorTableSearch").on("input", filterVendorTable);
   renderList();
   search();
 });
@@ -73,7 +74,23 @@ function onSearchErr(xhr) {
 
 function renderList() {
   $("#listContainer2").html(_.template(vendorTemplate, { vendors: vendors || [] }));
+  filterVendorTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterVendorTable() {
+  var searchText = $.trim($("#vendorTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function addVendor() {

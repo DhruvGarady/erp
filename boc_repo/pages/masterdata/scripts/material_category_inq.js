@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   categoryTemplate = $("#listTmpl").html();
   categories = [];
+  $("#categoryTableSearch").on("input", filterCategoryTable);
   renderList();
   search();
 });
@@ -73,7 +74,23 @@ function onSearchErr(xhr) {
 
 function renderList() {
   $("#listContainer2").html(_.template(categoryTemplate, { categories: categories || [] }));
+  filterCategoryTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterCategoryTable() {
+  var searchText = $.trim($("#categoryTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function addCategory() {

@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   warehouseTemplate = $("#listTmpl").html();
   warehouses = [];
+  $("#warehouseTableSearch").on("input", filterWarehouseTable);
   renderList();
   search();
 });
@@ -74,7 +75,23 @@ function onSearchErr(xhr) {
 
 function renderList() {
   $("#listContainer2").html(_.template(warehouseTemplate, { warehouses: warehouses || [] }));
+  filterWarehouseTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterWarehouseTable() {
+  var searchText = $.trim($("#warehouseTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function addWarehouse() {

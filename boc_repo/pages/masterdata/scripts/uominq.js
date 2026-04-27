@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   uomTemplate = $("#listTmpl").html();
   uoms = [];
+  $("#uomTableSearch").on("input", filterUomTable);
   renderList();
   search();
 });
@@ -73,7 +74,23 @@ function onSearchErr(xhr) {
 
 function renderList() {
   $("#listContainer2").html(_.template(uomTemplate, { uoms: uoms || [] }));
+  filterUomTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterUomTable() {
+  var searchText = $.trim($("#uomTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function addUom() {

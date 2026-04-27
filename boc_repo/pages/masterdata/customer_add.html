@@ -101,14 +101,19 @@
       <div class="fullSectionDiv">
         <table width="100%">
           <tr>
-            <td width="70%" class="mainTblHdr" id="pageTitle">Customer Information:</td>
+            <td width="85%" class="mainTblHdr" id="pageTitle">Customer Information:</td>
+            
             <td style="text-align:right;">
-              <button onclick="saveCustomer()" class="searchButton">
+              <button onclick="backToInquiry()" class="searchButton bg-danger">
+                <span class="material-icons">arrow_back</span>
+                <span>Back</span>
+              </button>
+            </td>
+                  <td width="1%"></td>
+            <td style="text-align:right;">
+              <button onclick="saveCustomer()" class="searchButton bg-primary">
                 <span class="material-icons">save</span>
                 <span>Save</span>
-              </button>
-              <button onclick="backToInquiry()" class="searchButton">
-                <span>Back</span>
               </button>
             </td>
           </tr>

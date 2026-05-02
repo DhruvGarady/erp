@@ -2,6 +2,8 @@ var editQuotationId;
 var customers = [];
 var currencies = [];
 var uoms = [];
+var materials = [];
+var taxes = [];
 var quotationItems = [];
 var quotationItemsTemplate;
 
@@ -15,8 +17,16 @@ $(document).ready(function () {
   var params = new URLSearchParams(window.location.search);
   editQuotationId = params.get("id");
 
-  $("#quotationItemsContainer").on("input change", ".quotation-line-input, .quotation-line-select", function () {
+  $("#quotationItemsContainer").on("change", ".lineMaterial", function () {
+    onLineMaterialChange($(this).closest("tr"));
+  });
+
+  $("#quotationItemsContainer").on("input change", ".quotation-line-input, .lineUnit", function () {
     syncQuotationItemRows();
+    calculateTotals();
+  });
+
+  $("#quote_discount_amount").on("input change", function () {
     calculateTotals();
   });
 
@@ -64,11 +74,15 @@ function loadLookups() {
   return $.when(
     getMasterList("mst_customer"),
     getMasterList("mst_currency"),
-    getMasterList("mst_uom")
-  ).done(function (customerRows, currencyRows, uomRows) {
+    getMasterList("mst_uom"),
+    getMasterList("mst_material"),
+    getMasterList("mst_tax")
+  ).done(function (customerRows, currencyRows, uomRows, materialRows, taxRows) {
     customers = customerRows || [];
     currencies = currencyRows || [];
     uoms = uomRows || [];
+    materials = materialRows || [];
+    taxes = taxRows || [];
   });
 }
 
@@ -107,6 +121,36 @@ function findCustomer(customerId) {
   });
 }
 
+function findMaterial(materialId) {
+  return _.find(materials, function (item) {
+    return String(item.material_id) === String(materialId);
+  });
+}
+
+function findMaterialByName(materialName) {
+  return _.find(materials, function (item) {
+    return String(item.material_name || "").toLowerCase() === String(materialName || "").toLowerCase();
+  });
+}
+
+function findTax(taxId) {
+  return _.find(taxes, function (item) {
+    return String(item.tax_id) === String(taxId);
+  });
+}
+
+function getTaxPercent(taxId) {
+  var tax = findTax(taxId);
+  return tax ? cleanDecimal(tax.tax_percent, 0) : 0;
+}
+
+function getUomValue(uomId) {
+  var uom = _.find(uoms, function (item) {
+    return String(item.uom_id) === String(uomId);
+  });
+  return uom ? (uom.uom_code || uom.uom_name || "") : "";
+}
+
 function loadNextQuotationNo() {
   $.ajax({
     type: "GET",
@@ -124,7 +168,10 @@ function addQuotationItem() {
 
   quotationItems.push({
     line_no: quotationItems.length + 1,
+    material_id: null,
     item_name: "",
+    part_code: "",
+    hsn_sac_code: "",
     item_description: "",
     qty: 1,
     unit: "",
@@ -138,6 +185,38 @@ function addQuotationItem() {
   renderQuotationItems();
 }
 
+function onLineMaterialChange(row) {
+  syncQuotationItemRows();
+
+  var index = parseInt(row.attr("data-index"), 10);
+  if (!quotationItems[index]) return;
+
+  var material = findMaterial(row.find(".lineMaterial").val());
+  if (!material) {
+    quotationItems[index].material_id = null;
+    quotationItems[index].item_name = "";
+    quotationItems[index].part_code = "";
+    quotationItems[index].hsn_sac_code = "";
+    renderQuotationItems();
+    return;
+  }
+
+  applyMaterialDefaults(quotationItems[index], material);
+  renderQuotationItems();
+}
+
+function applyMaterialDefaults(item, material) {
+  item.material_id = cleanInt(material.material_id, null);
+  item.item_name = material.material_name || "";
+  item.part_code = material.material_code || "";
+  item.hsn_sac_code = material.hsn_sac_code || "";
+  item.item_description = material.material_description || "";
+  item.unit = getUomValue(material.sales_uom_id || material.base_uom_id) || item.unit || "";
+  item.rate = cleanDecimal(material.standard_rate, item.rate || 0);
+  item.tax_percent = getTaxPercent(material.tax_id);
+  item.line_total = calculateLineTotal(item);
+}
+
 function deleteQuotationItem(index) {
   syncQuotationItemRows();
   quotationItems.splice(index, 1);
@@ -149,7 +228,12 @@ function syncQuotationItemRows() {
     var index = parseInt($(this).attr("data-index"), 10);
     if (!quotationItems[index]) return;
 
-    quotationItems[index].item_name = $.trim($(this).find(".lineItemName").val());
+    var materialId = cleanInt($(this).find(".lineMaterial").val(), null);
+    var material = findMaterial(materialId);
+    quotationItems[index].material_id = materialId;
+    quotationItems[index].item_name = material ? material.material_name : quotationItems[index].item_name;
+    quotationItems[index].part_code = material ? (material.material_code || "") : quotationItems[index].part_code;
+    quotationItems[index].hsn_sac_code = material ? (material.hsn_sac_code || "") : quotationItems[index].hsn_sac_code;
     quotationItems[index].item_description = $.trim($(this).find(".lineDescription").val());
     quotationItems[index].qty = cleanDecimal($(this).find(".lineQty").val(), 0);
     quotationItems[index].unit = $.trim($(this).find(".lineUnit").val());
@@ -164,8 +248,10 @@ function renderQuotationItems() {
   syncLineNumbers();
   calculateTotals();
 
-  $("#quotationItemsContainer").html(_.template(quotationItemsTemplate, {
+  var template = _.template(quotationItemsTemplate);
+  $("#quotationItemsContainer").html(template({
     items: quotationItems || [],
+    materials: materials || [],
     uoms: uoms || [],
     formatAmount: formatAmount
   }));
@@ -193,9 +279,9 @@ function calculateLineTotal(item) {
 
 function calculateTotals() {
   var subtotal = 0;
-  var discountTotal = 0;
+  var lineDiscountTotal = 0;
   var taxTotal = 0;
-  var grandTotal = 0;
+  var lineGrandTotal = 0;
 
   _.each(quotationItems, function (item) {
     var qty = Number(item.qty || 0);
@@ -208,13 +294,25 @@ function calculateTotals() {
     var taxAmount = taxableAmount * taxPercent / 100;
 
     subtotal += gross;
-    discountTotal += discountAmount;
+    lineDiscountTotal += discountAmount;
     taxTotal += taxAmount;
-    grandTotal += taxableAmount + taxAmount;
+    lineGrandTotal += taxableAmount + taxAmount;
     item.line_total = roundMoney(taxableAmount + taxAmount);
   });
 
+  var quoteDiscount = cleanDecimal($("#quote_discount_amount").val(), 0);
+  quoteDiscount = quoteDiscount < 0 ? 0 : quoteDiscount;
+
+  if (quoteDiscount > lineGrandTotal) {
+    quoteDiscount = lineGrandTotal;
+    $("#quote_discount_amount").val(roundMoney(quoteDiscount));
+  }
+
+  var discountTotal = lineDiscountTotal + quoteDiscount;
+  var grandTotal = lineGrandTotal - quoteDiscount;
+
   $("#subtotalLabel").text(formatAmount(subtotal));
+  $("#lineDiscountTotalLabel").text(formatAmount(lineDiscountTotal));
   $("#discountTotalLabel").text(formatAmount(discountTotal));
   $("#taxTotalLabel").text(formatAmount(taxTotal));
   $("#grandTotalLabel").text(formatAmount(grandTotal));
@@ -232,6 +330,19 @@ function calculateTotals() {
     tax_total: roundMoney(taxTotal),
     grand_total: roundMoney(grandTotal)
   };
+}
+
+function calculateLineDiscountTotal(items) {
+  var lineDiscountTotal = 0;
+
+  _.each(items || [], function (item) {
+    var qty = Number(item.qty || 0);
+    var rate = Number(item.rate || 0);
+    var discountPercent = Number(item.discount_percent || 0);
+    lineDiscountTotal += qty * rate * discountPercent / 100;
+  });
+
+  return roundMoney(lineDiscountTotal);
 }
 
 function buildPayload() {
@@ -264,6 +375,7 @@ function buildPayload() {
     items: _.map(quotationItems, function (item, index) {
       return {
         line_no: index + 1,
+        material_id: item.material_id,
         item_name: item.item_name,
         item_description: item.item_description,
         qty: cleanDecimal(item.qty, 0),
@@ -299,6 +411,11 @@ function validateQuotation(payload) {
   }
 
   for (var i = 0; i < payload.items.length; i++) {
+    if (!quotationItems[i].material_id) {
+      showWarningDialog("Material is required for every quotation item.");
+      return false;
+    }
+
     if (!payload.items[i].item_name) {
       showWarningDialog("Item name is required for every quotation item.");
       return false;
@@ -390,9 +507,14 @@ function loadQuotationDetails(quotationId) {
       $("#terms_conditions").val(header.terms_conditions || "");
 
       quotationItems = _.map(items, function (item, index) {
+        var material = findMaterialByName(item.item_name);
+        var materialId = material ? material.material_id : null;
         return {
           line_no: item.line_no || (index + 1),
+          material_id: materialId,
           item_name: item.item_name || "",
+          part_code: material ? (material.material_code || "") : "",
+          hsn_sac_code: material ? (material.hsn_sac_code || "") : "",
           item_description: item.item_description || "",
           qty: item.qty || 1,
           unit: item.unit || "",
@@ -403,6 +525,10 @@ function loadQuotationDetails(quotationId) {
           is_active: item.is_active || "Y"
         };
       });
+
+      var savedDiscountTotal = cleanDecimal(header.discount_total, 0);
+      var quoteDiscount = savedDiscountTotal - calculateLineDiscountTotal(quotationItems);
+      $("#quote_discount_amount").val(roundMoney(Math.max(quoteDiscount, 0)));
 
       if (!quotationItems.length) {
         addQuotationItem();

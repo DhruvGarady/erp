@@ -8,6 +8,7 @@ $(document).ready(function () {
 
   quotationTemplate = $("#listTmpl").html();
   quotationData = [];
+  $("#quotationTableSearch").on("input", filterQuotationTable);
   renderList([]);
   search();
 });
@@ -96,12 +97,29 @@ function onSearchErr(xhr) {
 }
 
 function renderList(rows) {
-  $("#listContainer2").html(_.template(quotationTemplate, {
+  var template = _.template(quotationTemplate);
+  $("#listContainer2").html(template({
     quotations: rows || [],
     formatDate: formatDate,
     formatAmount: formatAmount
   }));
+  filterQuotationTable();
   $("#listContainer2").trigger("create");
+}
+
+function filterQuotationTable() {
+  var searchText = $.trim($("#quotationTableSearch").val() || "").toLowerCase();
+  var rows = $("#listContainer2 table.dataTbl tr").not(":first");
+
+  if (!searchText) {
+    rows.show();
+    return;
+  }
+
+  rows.each(function () {
+    var rowText = $(this).text().toLowerCase();
+    $(this).toggle(rowText.indexOf(searchText) !== -1);
+  });
 }
 
 function normalizeDate(value) {

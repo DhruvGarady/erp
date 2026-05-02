@@ -217,6 +217,7 @@ CREATE TABLE mst_tax (
     is_active VARCHAR(20)
 );
 
+
 CREATE TABLE mst_payment_terms (
     payment_term_id INT AUTO_INCREMENT PRIMARY KEY,
     payment_term_code VARCHAR(50),
@@ -253,6 +254,7 @@ CREATE TABLE mst_material (
     updated_at DATETIME,
     is_active VARCHAR(20)
 );
+
 
 CREATE TABLE mst_bom (
     bom_id INT AUTO_INCREMENT PRIMARY KEY,

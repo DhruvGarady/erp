@@ -2,6 +2,7 @@ var userName;
 var menuOpen = false;
 var myPage;
 var parentFeatures;
+var menuTemplateHtml;
 $(function() {
 
 
@@ -278,15 +279,191 @@ function buildMenu(){
 	});*/
 	
 	
-	parentFeatures = JSON.parse(sessionStorage.getItem('FEATURES'));
-	var menuTemplate = $("#menuTmpl").html();
-	
+	parentFeatures = getStoredFeatureTree();
+	renderFeatureMenu(parentFeatures);
+	setupFeatureSearch();
 
-	$("#menuContainer").html(_.template(menuTemplate, parentFeatures));
+	//console.log(JSON.stringify(parentFeatures));
+	
+}
+
+function getStoredFeatureTree() {
+	var features = [];
+	var featuresText = sessionStorage.getItem('FEATURES');
+
+	if (featuresText != null && featuresText != "" && featuresText != undefined) {
+		try {
+			features = JSON.parse(featuresText) || [];
+		} catch (e) {
+			features = [];
+		}
+	}
+
+	return features;
+}
+
+function renderFeatureMenu(features) {
+	if ($("#menuContainer").length == 0) {
+		return;
+	}
+
+	if (!menuTemplateHtml) {
+		menuTemplateHtml = $("#menuTmpl").html();
+	}
+
+	if (!menuTemplateHtml) {
+		return;
+	}
+
+	parentFeatures = features || [];
+	var template = _.template(menuTemplateHtml);
+	$("#menuContainer").html(template({ parentFeatures: parentFeatures }));
 	$('#menuContainer').trigger("create");
+}
 
-	//console.log(JSON.stringify(parentFeatures)); 
-	
+function setupFeatureSearch() {
+	var featureSearch = $("#featureSearch");
+
+	if (featureSearch.length == 0 || typeof featureSearch.autocomplete !== "function") {
+		return;
+	}
+
+	if (featureSearch.data("ui-autocomplete")) {
+		featureSearch.autocomplete("destroy");
+	}
+
+	featureSearch.off(".featureSearch");
+
+	featureSearch.autocomplete({
+		minLength: 0,
+		delay: 100,
+		source: function(request, response) {
+			response(getMatchingFeatureSearchItems(request.term));
+		},
+		focus: function(event, ui) {
+			featureSearch.val(ui.item.label);
+			return false;
+		},
+		select: function(event, ui) {
+			featureSearch.val(ui.item.label);
+			filterFeatureMenu(ui.item.name || ui.item.label);
+			if (ui.item.url) {
+				linkPage(ui.item.url);
+			}
+			return false;
+		}
+	});
+
+	featureSearch.on("focus.featureSearch", function() {
+		$(this).autocomplete("search", $(this).val());
+	});
+
+	featureSearch.on("input.featureSearch", function() {
+		filterFeatureMenu($(this).val());
+	});
+
+	featureSearch.on("keydown.featureSearch", function(event) {
+		if (event.keyCode == 13) {
+			var matches = getMatchingFeatureSearchItems($(this).val());
+			if (matches.length > 0 && matches[0].url) {
+				event.preventDefault();
+				linkPage(matches[0].url);
+			}
+		}
+	});
+}
+
+function getFeatureSearchItems() {
+	var features = getStoredFeatureTree();
+	var searchItems = [];
+
+	_.each(features, function(item) {
+		addFeatureSearchItem(searchItems, item, null);
+
+		_.each(item.childFeatures || [], function(childItem) {
+			addFeatureSearchItem(searchItems, childItem, item);
+		});
+	});
+
+	return _.sortBy(searchItems, function(item) {
+		return item.label;
+	});
+}
+
+function addFeatureSearchItem(searchItems, item, parentItem) {
+	if (!item || !item.feature_name) {
+		return;
+	}
+
+	var label = parentItem && parentItem.feature_name ? parentItem.feature_name + " / " + item.feature_name : item.feature_name;
+
+	searchItems.push({
+		label: label,
+		value: label,
+		name: item.feature_name || "",
+		description: item.feature_description || "",
+		url: item.feature_url || ""
+	});
+}
+
+function getMatchingFeatureSearchItems(searchText) {
+	var searchTerm = normalizeFeatureSearchText(searchText);
+	var searchItems = getFeatureSearchItems();
+
+	if (!searchTerm) {
+		return searchItems.slice(0, 12);
+	}
+
+	return _.filter(searchItems, function(item) {
+		var searchableText = normalizeFeatureSearchText(item.label + " " + item.description + " " + item.url);
+		return searchableText.indexOf(searchTerm) !== -1;
+	}).slice(0, 12);
+}
+
+function filterFeatureMenu(searchText) {
+	var features = getStoredFeatureTree();
+	var searchTerm = normalizeFeatureSearchText(searchText);
+
+	if (!searchTerm) {
+		renderFeatureMenu(features);
+		return;
+	}
+
+	renderFeatureMenu(getFilteredFeatureTree(features, searchTerm));
+}
+
+function getFilteredFeatureTree(features, searchTerm) {
+	var filteredFeatures = [];
+
+	_.each(features || [], function(item) {
+		var parentMatches = featureMatchesSearch(item, searchTerm);
+		var childFeatures = item.childFeatures || [];
+		var matchingChildren = _.filter(childFeatures, function(childItem) {
+			return featureMatchesSearch(childItem, searchTerm);
+		});
+
+		if (parentMatches || matchingChildren.length > 0) {
+			var filteredItem = $.extend({}, item);
+			filteredItem.childFeatures = parentMatches ? childFeatures : matchingChildren;
+			filteredFeatures.push(filteredItem);
+		}
+	});
+
+	return filteredFeatures;
+}
+
+function featureMatchesSearch(item, searchTerm) {
+	var searchableText = normalizeFeatureSearchText(
+		(item.feature_name || "") + " " +
+		(item.feature_description || "") + " " +
+		(item.feature_url || "")
+	);
+
+	return searchableText.indexOf(searchTerm) !== -1;
+}
+
+function normalizeFeatureSearchText(value) {
+	return $.trim(String(value || "").toLowerCase());
 }
 
 /*function capitalizeWords(str) {

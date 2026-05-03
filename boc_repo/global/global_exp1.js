@@ -319,6 +319,77 @@ function renderFeatureMenu(features) {
 	var template = _.template(menuTemplateHtml);
 	$("#menuContainer").html(template({ parentFeatures: parentFeatures }));
 	$('#menuContainer').trigger("create");
+	applyActiveMenuState();
+}
+
+function applyActiveMenuState() {
+	var currentPath = normalizeMenuPath(location.pathname);
+
+	$("#menuContainer tr").removeClass("active-menu-row active-parent-menu-row");
+	$("#menuContainer td").removeClass("active-menu-cell");
+
+	$("#menuContainer tr").each(function() {
+		var row = $(this);
+		var rowUrl = getMenuRowUrl(row);
+
+		if (rowUrl != "" && menuUrlMatchesCurrentPage(rowUrl, currentPath)) {
+			row.addClass("active-menu-row");
+			row.find("td").addClass("active-menu-cell");
+			markNearestParentMenu(row);
+			return false;
+		}
+	});
+}
+
+function getMenuRowUrl(row) {
+	var rowUrl = "";
+
+	row.find("td").each(function() {
+		var clickText = $(this).attr("onclick") || "";
+		var match = clickText.match(/linkPage\(['"]([^'"]+)['"]\)/);
+		if (match && match[1]) {
+			rowUrl = match[1];
+			return false;
+		}
+	});
+
+	return rowUrl;
+}
+
+function menuUrlMatchesCurrentPage(menuUrl, currentPath) {
+	var menuPath = normalizeMenuPath(menuUrl);
+
+	if (!menuPath || !currentPath) {
+		return false;
+	}
+
+	return currentPath === menuPath || currentPath.endsWith("/" + menuPath);
+}
+
+function normalizeMenuPath(url) {
+	var normalizedUrl = String(url || "").replace(/\\/g, "/").split("?")[0].split("#")[0].toLowerCase();
+	var pagesIndex = normalizedUrl.indexOf("/pages/");
+
+	if (pagesIndex !== -1) {
+		normalizedUrl = normalizedUrl.substring(pagesIndex + 1);
+	}
+
+	normalizedUrl = normalizedUrl.replace(/^\/+/, "");
+
+	while (normalizedUrl.indexOf("../") === 0) {
+		normalizedUrl = normalizedUrl.substring(3);
+	}
+
+	return normalizedUrl;
+}
+
+function markNearestParentMenu(activeRow) {
+	var parentTable = activeRow.closest("table");
+	var firstRow = parentTable.find("tr").first();
+
+	if (firstRow.length && !firstRow.is(activeRow)) {
+		firstRow.addClass("active-parent-menu-row");
+	}
 }
 
 function setupFeatureSearch() {

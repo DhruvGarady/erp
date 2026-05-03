@@ -35,6 +35,27 @@ CREATE TABLE quotations (
     is_active VARCHAR(20)
 );
 
+ALTER TABLE quotations
+ADD COLUMN billing_address VARCHAR(255) AFTER customer_contact,
+ADD COLUMN shipping_address VARCHAR(255) AFTER billing_address,
+ADD COLUMN payment_term_id INT AFTER currency,
+ADD COLUMN salesperson_id INT AFTER payment_term_id,
+ADD COLUMN warehouse_id INT AFTER salesperson_id,
+ADD COLUMN currency_id INT AFTER warehouse_id,
+ADD COLUMN exchange_rate DECIMAL(12,4) AFTER currency_id,
+ADD COLUMN discount_type VARCHAR(20) AFTER subtotal,
+ADD COLUMN discount_value DECIMAL(12,2) AFTER discount_type,
+ADD COLUMN taxable_total DECIMAL(12,2) AFTER discount_total,
+ADD COLUMN other_charges DECIMAL(12,2) AFTER taxable_total,
+ADD COLUMN freight_amount DECIMAL(12,2) AFTER other_charges,
+ADD COLUMN packing_amount DECIMAL(12,2) AFTER freight_amount,
+ADD COLUMN round_off DECIMAL(12,2) AFTER grand_total,
+ADD COLUMN revision_no INT AFTER status,
+ADD COLUMN approval_status VARCHAR(50) AFTER revision_no,
+ADD COLUMN reason VARCHAR(255) AFTER approval_status;
+
+
+
 CREATE TABLE quotation_items (
     quotation_item_id INT AUTO_INCREMENT PRIMARY KEY,
     quotation_id INT NOT NULL,
@@ -51,6 +72,30 @@ CREATE TABLE quotation_items (
     updated_at DATETIME,
     is_active VARCHAR(20)
 );
+
+ALTER TABLE quotation_items
+ADD COLUMN material_id INT AFTER line_no,
+ADD COLUMN material_code VARCHAR(50) AFTER material_id,
+ADD COLUMN material_type VARCHAR(50) AFTER item_name,
+ADD COLUMN hsn_sac_code VARCHAR(50) AFTER material_type,
+ADD COLUMN uom_id INT AFTER unit,
+ADD COLUMN tax_id INT AFTER tax_percent,
+ADD COLUMN discount_type VARCHAR(20) AFTER rate,
+ADD COLUMN discount_value DECIMAL(12,2) AFTER discount_type,
+ADD COLUMN discount_amount DECIMAL(12,2) AFTER discount_value,
+ADD COLUMN gross_amount DECIMAL(12,2) AFTER discount_amount,
+ADD COLUMN taxable_amount DECIMAL(12,2) AFTER gross_amount,
+ADD COLUMN cgst_percent DECIMAL(5,2) AFTER taxable_amount,
+ADD COLUMN cgst_amount DECIMAL(12,2) AFTER cgst_percent,
+ADD COLUMN sgst_percent DECIMAL(5,2) AFTER cgst_amount,
+ADD COLUMN sgst_amount DECIMAL(12,2) AFTER sgst_percent,
+ADD COLUMN igst_percent DECIMAL(5,2) AFTER sgst_amount,
+ADD COLUMN igst_amount DECIMAL(12,2) AFTER igst_percent,
+ADD COLUMN warehouse_id INT AFTER igst_amount,
+ADD COLUMN delivery_date DATE AFTER warehouse_id,
+ADD COLUMN item_status VARCHAR(50) AFTER delivery_date;
+
+
 
 ALTER TABLE customers 
 ADD created_by VARCHAR(255) DEFAULT 'system',
@@ -254,7 +299,32 @@ CREATE TABLE mst_material (
     updated_at DATETIME,
     is_active VARCHAR(20)
 );
-
+ALTER TABLE mst_material
+ADD COLUMN sales_rate DECIMAL(12,2) AFTER standard_rate,
+ADD COLUMN min_sale_qty DECIMAL(12,2) AFTER sales_rate,
+ADD COLUMN max_sale_qty DECIMAL(12,2) AFTER min_sale_qty,
+ADD COLUMN discount_allowed VARCHAR(20) AFTER max_sale_qty,
+ADD COLUMN default_discount_percent DECIMAL(5,2) AFTER discount_allowed,
+ADD COLUMN tax_classification VARCHAR(50) AFTER tax_id,
+ADD COLUMN gst_applicable VARCHAR(20) AFTER tax_classification,
+ADD COLUMN is_tax_inclusive VARCHAR(20) AFTER gst_applicable,
+ADD COLUMN cess_percent DECIMAL(5,2) AFTER is_tax_inclusive,
+ADD COLUMN preferred_vendor_id INT AFTER cess_percent,
+ADD COLUMN lead_time_days INT AFTER preferred_vendor_id,
+ADD COLUMN moq DECIMAL(12,2) AFTER lead_time_days,
+ADD COLUMN procurement_type VARCHAR(50) AFTER moq,
+ADD COLUMN safety_stock DECIMAL(12,2) AFTER max_stock,
+ADD COLUMN storage_condition VARCHAR(100) AFTER safety_stock,
+ADD COLUMN shelf_life_days INT AFTER storage_condition,
+ADD COLUMN default_warehouse_id INT AFTER shelf_life_days,
+ADD COLUMN costing_method VARCHAR(50) AFTER default_warehouse_id,
+ADD COLUMN weight DECIMAL(12,3) AFTER costing_method,
+ADD COLUMN length DECIMAL(12,3) AFTER weight,
+ADD COLUMN width DECIMAL(12,3) AFTER length,
+ADD COLUMN height DECIMAL(12,3) AFTER width,
+ADD COLUMN dimension_uom VARCHAR(20) AFTER height,
+ADD COLUMN brand VARCHAR(100) AFTER dimension_uom,
+ADD COLUMN model_no VARCHAR(100) AFTER brand;
 
 CREATE TABLE mst_bom (
     bom_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -380,6 +450,92 @@ CREATE TABLE trn_journal_entry (
     reference_id VARCHAR(50),
     created_by VARCHAR(50),
     updated_by VARCHAR(50),
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+
+
+
+
+CREATE TABLE sales_orders (
+    sales_order_id INT AUTO_INCREMENT PRIMARY KEY,
+    sales_order_no VARCHAR(30) NOT NULL,
+    sales_order_date DATE NOT NULL,
+    quotation_id INT,
+    quotation_no VARCHAR(30),
+    customer_id INT NOT NULL,
+    customer_name VARCHAR(150) NOT NULL,
+    customer_contact VARCHAR(150),
+    billing_address VARCHAR(255),
+    shipping_address VARCHAR(255),
+    reference_no VARCHAR(100),
+    subject VARCHAR(255),
+    currency VARCHAR(20),
+    currency_id INT,
+    exchange_rate DECIMAL(12,4),
+    payment_term_id INT,
+    salesperson_id INT,
+    warehouse_id INT,
+    delivery_date DATE,
+    status VARCHAR(50),
+    approval_status VARCHAR(50),
+    notes TEXT,
+    terms_conditions TEXT,
+    subtotal DECIMAL(12,2),
+    discount_type VARCHAR(20),
+    discount_value DECIMAL(12,2),
+    discount_total DECIMAL(12,2),
+    taxable_total DECIMAL(12,2),
+    tax_total DECIMAL(12,2),
+    freight_amount DECIMAL(12,2),
+    packing_amount DECIMAL(12,2),
+    other_charges DECIMAL(12,2),
+    round_off DECIMAL(12,2),
+    grand_total DECIMAL(12,2),
+    created_by INT,
+    updated_by INT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+CREATE TABLE sales_order_items (
+    sales_order_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    sales_order_id INT NOT NULL,
+    quotation_item_id INT,
+    line_no INT,
+    material_id INT,
+    material_code VARCHAR(50),
+    item_name VARCHAR(255) NOT NULL,
+    material_type VARCHAR(50),
+    item_description TEXT,
+    hsn_sac_code VARCHAR(50),
+    qty DECIMAL(12,2),
+    delivered_qty DECIMAL(12,2),
+    invoiced_qty DECIMAL(12,2),
+    unit VARCHAR(50),
+    uom_id INT,
+    rate DECIMAL(12,2),
+    gross_amount DECIMAL(12,2),
+    discount_type VARCHAR(20),
+    discount_value DECIMAL(12,2),
+    discount_amount DECIMAL(12,2),
+    taxable_amount DECIMAL(12,2),
+    tax_id INT,
+    tax_percent DECIMAL(5,2),
+    cgst_percent DECIMAL(5,2),
+    cgst_amount DECIMAL(12,2),
+    sgst_percent DECIMAL(5,2),
+    sgst_amount DECIMAL(12,2),
+    igst_percent DECIMAL(5,2),
+    igst_amount DECIMAL(12,2),
+    tax_amount DECIMAL(12,2),
+    line_total DECIMAL(12,2),
+    warehouse_id INT,
+    delivery_date DATE,
+    item_status VARCHAR(50),
     created_at DATETIME,
     updated_at DATETIME,
     is_active VARCHAR(20)

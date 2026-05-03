@@ -3,6 +3,8 @@ var materialGroups = [];
 var uoms = [];
 var currencies = [];
 var taxes = [];
+var vendors = [];
+var warehouses = [];
 
 $(document).ready(function () {
   isUserLoggedIn();
@@ -51,12 +53,16 @@ function loadLookups() {
     getMasterList("mst_material_group"),
     getMasterList("mst_uom"),
     getMasterList("mst_currency"),
-    getMasterList("mst_tax")
-  ).done(function (groupRows, uomRows, currencyRows, taxRows) {
+    getMasterList("mst_tax"),
+    getMasterList("mst_vendor"),
+    getMasterList("mst_warehouse")
+  ).done(function (groupRows, uomRows, currencyRows, taxRows, vendorRows, warehouseRows) {
     materialGroups = groupRows || [];
     uoms = uomRows || [];
     currencies = currencyRows || [];
     taxes = taxRows || [];
+    vendors = vendorRows || [];
+    warehouses = warehouseRows || [];
   });
 }
 
@@ -67,6 +73,8 @@ function renderSelectOptions() {
   renderUomOptions("#sales_uom_id");
   renderCurrencyOptions();
   renderTaxOptions();
+  renderVendorOptions();
+  renderWarehouseOptions();
 }
 
 function renderMaterialGroupOptions() {
@@ -101,6 +109,24 @@ function renderTaxOptions() {
   $("#tax_id").html(html);
 }
 
+function renderVendorOptions() {
+  var html = '<option value="">Select</option>';
+  _.each(vendors, function (vendor) {
+    var vendorText = (vendor.vendor_code ? vendor.vendor_code + " - " : "") + (vendor.vendor_name || "");
+    html += '<option value="' + vendor.vendor_id + '">' + vendorText + "</option>";
+  });
+  $("#preferred_vendor_id").html(html);
+}
+
+function renderWarehouseOptions() {
+  var html = '<option value="">Select</option>';
+  _.each(warehouses, function (warehouse) {
+    var warehouseText = (warehouse.warehouse_code ? warehouse.warehouse_code + " - " : "") + (warehouse.warehouse_name || "");
+    html += '<option value="' + warehouse.warehouse_id + '">' + warehouseText + "</option>";
+  });
+  $("#default_warehouse_id").html(html);
+}
+
 function cleanInt(val) {
   if (val === null || val === undefined || val === "") return null;
   var parsed = parseInt(val, 10);
@@ -128,9 +154,34 @@ function buildPayload() {
     tax_id: cleanInt($("#tax_id").val()),
     hsn_sac_code: $.trim($("#hsn_sac_code").val()),
     standard_rate: cleanDecimal($("#standard_rate").val()),
+    sales_rate: cleanDecimal($("#sales_rate").val()),
+    min_sale_qty: cleanDecimal($("#min_sale_qty").val()),
+    max_sale_qty: cleanDecimal($("#max_sale_qty").val()),
+    discount_allowed: $("#discount_allowed").val(),
+    default_discount_percent: cleanDecimal($("#default_discount_percent").val()),
+    tax_classification: $("#tax_classification").val(),
+    gst_applicable: $("#gst_applicable").val(),
+    is_tax_inclusive: $("#is_tax_inclusive").val(),
+    cess_percent: cleanDecimal($("#cess_percent").val()),
+    preferred_vendor_id: cleanInt($("#preferred_vendor_id").val()),
+    lead_time_days: cleanInt($("#lead_time_days").val()),
+    moq: cleanDecimal($("#moq").val()),
+    procurement_type: $("#procurement_type").val(),
     reorder_level: cleanDecimal($("#reorder_level").val()),
     min_stock: cleanDecimal($("#min_stock").val()),
     max_stock: cleanDecimal($("#max_stock").val()),
+    safety_stock: cleanDecimal($("#safety_stock").val()),
+    storage_condition: $.trim($("#storage_condition").val()),
+    shelf_life_days: cleanInt($("#shelf_life_days").val()),
+    default_warehouse_id: cleanInt($("#default_warehouse_id").val()),
+    costing_method: $("#costing_method").val(),
+    weight: cleanDecimal($("#weight").val()),
+    length: cleanDecimal($("#length").val()),
+    width: cleanDecimal($("#width").val()),
+    height: cleanDecimal($("#height").val()),
+    dimension_uom: $("#dimension_uom").val(),
+    brand: $.trim($("#brand").val()),
+    model_no: $.trim($("#model_no").val()),
     material_description: $.trim($("#material_description").val()),
     is_active: $("#is_active").val() || "Y",
     created_by: userName,
@@ -228,9 +279,34 @@ function loadMaterialDetails(materialId) {
       $("#tax_id").val(data.tax_id || "");
       $("#hsn_sac_code").val(data.hsn_sac_code || "");
       $("#standard_rate").val(data.standard_rate || "");
+      $("#sales_rate").val(data.sales_rate || "");
+      $("#min_sale_qty").val(data.min_sale_qty || "");
+      $("#max_sale_qty").val(data.max_sale_qty || "");
+      $("#discount_allowed").val(data.discount_allowed || "");
+      $("#default_discount_percent").val(data.default_discount_percent || "");
+      $("#tax_classification").val(data.tax_classification || "");
+      $("#gst_applicable").val(data.gst_applicable || "");
+      $("#is_tax_inclusive").val(data.is_tax_inclusive || "");
+      $("#cess_percent").val(data.cess_percent || "");
+      $("#preferred_vendor_id").val(data.preferred_vendor_id || "");
+      $("#lead_time_days").val(data.lead_time_days || "");
+      $("#moq").val(data.moq || "");
+      $("#procurement_type").val(data.procurement_type || "");
       $("#reorder_level").val(data.reorder_level || "");
       $("#min_stock").val(data.min_stock || "");
       $("#max_stock").val(data.max_stock || "");
+      $("#safety_stock").val(data.safety_stock || "");
+      $("#storage_condition").val(data.storage_condition || "");
+      $("#shelf_life_days").val(data.shelf_life_days || "");
+      $("#default_warehouse_id").val(data.default_warehouse_id || "");
+      $("#costing_method").val(data.costing_method || "");
+      $("#weight").val(data.weight || "");
+      $("#length").val(data.length || "");
+      $("#width").val(data.width || "");
+      $("#height").val(data.height || "");
+      $("#dimension_uom").val(data.dimension_uom || "");
+      $("#brand").val(data.brand || "");
+      $("#model_no").val(data.model_no || "");
       $("#material_description").val(data.material_description || "");
       $("#is_active").val(data.is_active || "Y");
     },

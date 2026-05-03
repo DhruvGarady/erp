@@ -294,7 +294,21 @@ const MASTER_TABLE_CONFIG = {
     },
     mst_material: {
         pk: "material_id",
-        searchable: ["material_code", "material_name", "material_type", "hsn_sac_code", "material_description"]
+        searchable: [
+            "material_code",
+            "material_name",
+            "material_type",
+            "hsn_sac_code",
+            "material_description",
+            "brand",
+            "model_no",
+            "tax_classification",
+            "gst_applicable",
+            "procurement_type",
+            "storage_condition",
+            "costing_method",
+            "dimension_uom"
+        ]
     },
     mst_currency: {
         pk: "currency_id",
@@ -880,10 +894,17 @@ app.get("/quotation/list", verifyToken, (req, res) => {
             quotation_date,
             customer_name,
             customer_contact,
+            billing_address,
+            shipping_address,
             subject,
             status,
+            revision_no,
+            approval_status,
             currency,
+            currency_id,
+            warehouse_id,
             grand_total,
+            round_off,
             valid_till,
             created_at,
             updated_at,
@@ -934,6 +955,187 @@ app.get("/quotation/:id", verifyToken, (req, res) => {
     });
 });
 
+const QUOTATION_HEADER_COLUMNS = [
+    "quotation_no",
+    "quotation_date",
+    "customer_id",
+    "customer_name",
+    "customer_contact",
+    "billing_address",
+    "shipping_address",
+    "valid_till",
+    "reference_no",
+    "subject",
+    "currency",
+    "payment_term_id",
+    "salesperson_id",
+    "warehouse_id",
+    "currency_id",
+    "exchange_rate",
+    "notes",
+    "terms_conditions",
+    "status",
+    "revision_no",
+    "approval_status",
+    "reason",
+    "subtotal",
+    "discount_type",
+    "discount_value",
+    "discount_total",
+    "taxable_total",
+    "other_charges",
+    "freight_amount",
+    "packing_amount",
+    "tax_total",
+    "grand_total",
+    "round_off",
+    "created_by",
+    "updated_by",
+    "created_at",
+    "updated_at",
+    "is_active"
+];
+
+const QUOTATION_ITEM_COLUMNS = [
+    "quotation_id",
+    "line_no",
+    "material_id",
+    "material_code",
+    "item_name",
+    "material_type",
+    "hsn_sac_code",
+    "item_description",
+    "qty",
+    "unit",
+    "uom_id",
+    "rate",
+    "discount_type",
+    "discount_value",
+    "discount_amount",
+    "gross_amount",
+    "taxable_amount",
+    "discount_percent",
+    "tax_percent",
+    "tax_id",
+    "cgst_percent",
+    "cgst_amount",
+    "sgst_percent",
+    "sgst_amount",
+    "igst_percent",
+    "igst_amount",
+    "warehouse_id",
+    "delivery_date",
+    "item_status",
+    "line_total",
+    "created_at",
+    "updated_at",
+    "is_active"
+];
+
+function dbValue(value, fallback = null) {
+    return value === undefined ? fallback : value;
+}
+
+function buildQuotationHeader(header, dateNow, isCreate) {
+    const source = header || {};
+    const createdBy = dbValue(source.created_by, source.updated_by || null);
+    const updatedBy = dbValue(source.updated_by, createdBy);
+
+    return {
+        quotation_no: dbValue(source.quotation_no),
+        quotation_date: dbValue(source.quotation_date),
+        customer_id: dbValue(source.customer_id),
+        customer_name: dbValue(source.customer_name),
+        customer_contact: dbValue(source.customer_contact),
+        billing_address: dbValue(source.billing_address),
+        shipping_address: dbValue(source.shipping_address),
+        valid_till: dbValue(source.valid_till),
+        reference_no: dbValue(source.reference_no),
+        subject: dbValue(source.subject),
+        currency: dbValue(source.currency),
+        payment_term_id: dbValue(source.payment_term_id),
+        salesperson_id: dbValue(source.salesperson_id),
+        warehouse_id: dbValue(source.warehouse_id),
+        currency_id: dbValue(source.currency_id),
+        exchange_rate: dbValue(source.exchange_rate),
+        notes: dbValue(source.notes),
+        terms_conditions: dbValue(source.terms_conditions),
+        status: dbValue(source.status, "Draft"),
+        revision_no: dbValue(source.revision_no, 0),
+        approval_status: dbValue(source.approval_status, "Pending"),
+        reason: dbValue(source.reason),
+        subtotal: dbValue(source.subtotal, 0),
+        discount_type: dbValue(source.discount_type),
+        discount_value: dbValue(source.discount_value, 0),
+        discount_total: dbValue(source.discount_total, 0),
+        taxable_total: dbValue(source.taxable_total, 0),
+        other_charges: dbValue(source.other_charges, 0),
+        freight_amount: dbValue(source.freight_amount, 0),
+        packing_amount: dbValue(source.packing_amount, 0),
+        tax_total: dbValue(source.tax_total, 0),
+        grand_total: dbValue(source.grand_total, 0),
+        round_off: dbValue(source.round_off, 0),
+        created_by: isCreate ? createdBy : dbValue(source.created_by),
+        updated_by: updatedBy,
+        created_at: isCreate ? dateNow : dbValue(source.created_at),
+        updated_at: dateNow,
+        is_active: dbValue(source.is_active, "Y")
+    };
+}
+
+function buildQuotationItem(item, quotationId, index, dateNow) {
+    const source = item || {};
+
+    return {
+        quotation_id: quotationId,
+        line_no: dbValue(source.line_no, index + 1),
+        material_id: dbValue(source.material_id),
+        material_code: dbValue(source.material_code),
+        item_name: dbValue(source.item_name),
+        material_type: dbValue(source.material_type),
+        hsn_sac_code: dbValue(source.hsn_sac_code),
+        item_description: dbValue(source.item_description),
+        qty: dbValue(source.qty, 0),
+        unit: dbValue(source.unit),
+        uom_id: dbValue(source.uom_id),
+        rate: dbValue(source.rate, 0),
+        discount_type: dbValue(source.discount_type),
+        discount_value: dbValue(source.discount_value, 0),
+        discount_amount: dbValue(source.discount_amount, 0),
+        gross_amount: dbValue(source.gross_amount, 0),
+        taxable_amount: dbValue(source.taxable_amount, 0),
+        discount_percent: dbValue(source.discount_percent, 0),
+        tax_percent: dbValue(source.tax_percent, 0),
+        tax_id: dbValue(source.tax_id),
+        cgst_percent: dbValue(source.cgst_percent, 0),
+        cgst_amount: dbValue(source.cgst_amount, 0),
+        sgst_percent: dbValue(source.sgst_percent, 0),
+        sgst_amount: dbValue(source.sgst_amount, 0),
+        igst_percent: dbValue(source.igst_percent, 0),
+        igst_amount: dbValue(source.igst_amount, 0),
+        warehouse_id: dbValue(source.warehouse_id),
+        delivery_date: dbValue(source.delivery_date),
+        item_status: dbValue(source.item_status, "Open"),
+        line_total: dbValue(source.line_total, 0),
+        created_at: dateNow,
+        updated_at: dateNow,
+        is_active: dbValue(source.is_active, "Y")
+    };
+}
+
+function insertQuotationItems(connection, quotationId, items, dateNow, callback) {
+    if (!items || items.length === 0) {
+        return callback();
+    }
+
+    const itemSql = `INSERT INTO quotation_items (${QUOTATION_ITEM_COLUMNS.join(", ")}) VALUES ?`;
+    const itemValues = items.map((item, idx) => {
+        const row = buildQuotationItem(item, quotationId, idx, dateNow);
+        return QUOTATION_ITEM_COLUMNS.map(col => row[col]);
+    });
+
+    connection.query(itemSql, [itemValues], callback);
+}
 
 // ==================================================================
 // 3. POST /quotation/create
@@ -943,41 +1145,9 @@ app.get("/quotation/:id", verifyToken, (req, res) => {
 app.post("/quotation/create", verifyToken, (req, res) => {
     const { header, items } = req.body;
     const dateNow = now();
-
-    const headerSql = `
-        INSERT INTO quotations (
-            quotation_no, quotation_date, customer_id, customer_name,
-            customer_contact, valid_till, reference_no, subject,
-            currency, notes, terms_conditions, status,
-            subtotal, discount_total, tax_total, grand_total,
-            created_by, updated_by,
-            created_at, updated_at, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const headerValues = [
-        header.quotation_no,
-        header.quotation_date,
-        header.customer_id,
-        header.customer_name,
-        header.customer_contact,
-        header.valid_till,
-        header.reference_no,
-        header.subject,
-        header.currency,
-        header.notes,
-        header.terms_conditions,
-        header.status,
-        header.subtotal,
-        header.discount_total,
-        header.tax_total,
-        header.grand_total,
-        header.created_by,
-        header.created_by,   // updated_by = created_by on insert
-        dateNow,
-        dateNow,
-        "Y"
-    ];
+    const headerRow = buildQuotationHeader(header, dateNow, true);
+    const headerSql = `INSERT INTO quotations (${QUOTATION_HEADER_COLUMNS.join(", ")}) VALUES (${QUOTATION_HEADER_COLUMNS.map(() => "?").join(", ")})`;
+    const headerValues = QUOTATION_HEADER_COLUMNS.map(col => headerRow[col]);
 
     pool.getConnection((connErr, connection) => {
         if (connErr) {
@@ -1003,41 +1173,7 @@ app.post("/quotation/create", verifyToken, (req, res) => {
 
                 const quotationId = headerResult.insertId;
 
-                if (!items || items.length === 0) {
-                    // No items — commit and return
-                    return connection.commit((commitErr) => {
-                        connection.release();
-                        if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                        res.json({ success: true, quotation_id: quotationId });
-                    });
-                }
-
-                // Build bulk item insert
-                const itemSql = `
-                    INSERT INTO quotation_items (
-                        quotation_id, line_no, item_name, item_description,
-                        qty, unit, rate, discount_percent, tax_percent, line_total,
-                        created_at, updated_at, is_active
-                    ) VALUES ?
-                `;
-
-                const itemValues = items.map((item, idx) => [
-                    quotationId,
-                    item.line_no || (idx + 1),
-                    item.item_name,
-                    item.item_description,
-                    item.qty,
-                    item.unit,
-                    item.rate,
-                    item.discount_percent,
-                    item.tax_percent,
-                    item.line_total,
-                    dateNow,
-                    dateNow,
-                    "Y"
-                ]);
-
-                connection.query(itemSql, [itemValues], (itemErr) => {
+                insertQuotationItems(connection, quotationId, items, dateNow, (itemErr) => {
                     if (itemErr) {
                         return connection.rollback(() => {
                             connection.release();
@@ -1067,53 +1203,10 @@ app.put("/quotation/update/:id", verifyToken, (req, res) => {
     const quotationId = req.params.id;
     const { header, items } = req.body;
     const dateNow = now();
-
-    const updateHeaderSql = `
-        UPDATE quotations SET
-            quotation_no       = ?,
-            quotation_date     = ?,
-            customer_id        = ?,
-            customer_name      = ?,
-            customer_contact   = ?,
-            valid_till         = ?,
-            reference_no       = ?,
-            subject            = ?,
-            currency           = ?,
-            notes              = ?,
-            terms_conditions   = ?,
-            status             = ?,
-            subtotal           = ?,
-            discount_total     = ?,
-            tax_total          = ?,
-            grand_total        = ?,
-            updated_by         = ?,
-            updated_at         = ?,
-            is_active          = ?
-        WHERE quotation_id = ?
-    `;
-
-    const headerValues = [
-        header.quotation_no,
-        header.quotation_date,
-        header.customer_id,
-        header.customer_name,
-        header.customer_contact,
-        header.valid_till,
-        header.reference_no,
-        header.subject,
-        header.currency,
-        header.notes,
-        header.terms_conditions,
-        header.status,
-        header.subtotal,
-        header.discount_total,
-        header.tax_total,
-        header.grand_total,
-        header.updated_by,
-        dateNow,
-        "Y",
-        quotationId
-    ];
+    const headerRow = buildQuotationHeader(header, dateNow, false);
+    const updateColumns = QUOTATION_HEADER_COLUMNS.filter(col => !["created_by", "created_at"].includes(col));
+    const updateHeaderSql = `UPDATE quotations SET ${updateColumns.map(col => `${col} = ?`).join(", ")} WHERE quotation_id = ?`;
+    const headerValues = [...updateColumns.map(col => headerRow[col]), quotationId];
 
     pool.getConnection((connErr, connection) => {
         if (connErr) {
@@ -1147,40 +1240,7 @@ app.put("/quotation/update/:id", verifyToken, (req, res) => {
                         });
                     }
 
-                    if (!items || items.length === 0) {
-                        return connection.commit((commitErr) => {
-                            connection.release();
-                            if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                            res.json({ success: true, quotation_id: quotationId });
-                        });
-                    }
-
-                    // Step 3: Insert fresh items
-                    const itemSql = `
-                        INSERT INTO quotation_items (
-                            quotation_id, line_no, item_name, item_description,
-                            qty, unit, rate, discount_percent, tax_percent, line_total,
-                            created_at, updated_at, is_active
-                        ) VALUES ?
-                    `;
-
-                    const itemValues = items.map((item, idx) => [
-                        quotationId,
-                        item.line_no || (idx + 1),
-                        item.item_name,
-                        item.item_description,
-                        item.qty,
-                        item.unit,
-                        item.rate,
-                        item.discount_percent,
-                        item.tax_percent,
-                        item.line_total,
-                        dateNow,
-                        dateNow,
-                        "Y"
-                    ]);
-
-                    connection.query(itemSql, [itemValues], (itemErr) => {
+                    insertQuotationItems(connection, quotationId, items, dateNow, (itemErr) => {
                         if (itemErr) {
                             return connection.rollback(() => {
                                 connection.release();
@@ -1288,6 +1348,492 @@ app.get("/quotation/nextno", verifyToken, (req, res) => {
     });
 });
 //-----------------------------------------quotation end ----------------------------------------------
+
+//----------------------------------------------------SALES ORDER MODULE------------------------------------------------
+
+const SALES_ORDER_HEADER_COLUMNS = [
+    "sales_order_no",
+    "sales_order_date",
+    "quotation_id",
+    "quotation_no",
+    "customer_id",
+    "customer_name",
+    "customer_contact",
+    "billing_address",
+    "shipping_address",
+    "reference_no",
+    "subject",
+    "currency",
+    "currency_id",
+    "exchange_rate",
+    "payment_term_id",
+    "salesperson_id",
+    "warehouse_id",
+    "delivery_date",
+    "status",
+    "approval_status",
+    "notes",
+    "terms_conditions",
+    "subtotal",
+    "discount_type",
+    "discount_value",
+    "discount_total",
+    "taxable_total",
+    "tax_total",
+    "freight_amount",
+    "packing_amount",
+    "other_charges",
+    "round_off",
+    "grand_total",
+    "created_by",
+    "updated_by",
+    "created_at",
+    "updated_at",
+    "is_active"
+];
+
+const SALES_ORDER_ITEM_COLUMNS = [
+    "sales_order_id",
+    "quotation_item_id",
+    "line_no",
+    "material_id",
+    "material_code",
+    "item_name",
+    "material_type",
+    "item_description",
+    "hsn_sac_code",
+    "qty",
+    "delivered_qty",
+    "invoiced_qty",
+    "unit",
+    "uom_id",
+    "rate",
+    "gross_amount",
+    "discount_type",
+    "discount_value",
+    "discount_amount",
+    "taxable_amount",
+    "tax_id",
+    "tax_percent",
+    "cgst_percent",
+    "cgst_amount",
+    "sgst_percent",
+    "sgst_amount",
+    "igst_percent",
+    "igst_amount",
+    "tax_amount",
+    "line_total",
+    "warehouse_id",
+    "delivery_date",
+    "item_status",
+    "created_at",
+    "updated_at",
+    "is_active"
+];
+
+function buildSalesOrderHeader(header, dateNow, isCreate) {
+    const source = header || {};
+    const createdBy = dbValue(source.created_by, source.updated_by || null);
+    const updatedBy = dbValue(source.updated_by, createdBy);
+
+    return {
+        sales_order_no: dbValue(source.sales_order_no),
+        sales_order_date: dbValue(source.sales_order_date),
+        quotation_id: dbValue(source.quotation_id),
+        quotation_no: dbValue(source.quotation_no),
+        customer_id: dbValue(source.customer_id),
+        customer_name: dbValue(source.customer_name),
+        customer_contact: dbValue(source.customer_contact),
+        billing_address: dbValue(source.billing_address),
+        shipping_address: dbValue(source.shipping_address),
+        reference_no: dbValue(source.reference_no),
+        subject: dbValue(source.subject),
+        currency: dbValue(source.currency),
+        currency_id: dbValue(source.currency_id),
+        exchange_rate: dbValue(source.exchange_rate, 1),
+        payment_term_id: dbValue(source.payment_term_id),
+        salesperson_id: dbValue(source.salesperson_id),
+        warehouse_id: dbValue(source.warehouse_id),
+        delivery_date: dbValue(source.delivery_date),
+        status: dbValue(source.status, "Draft"),
+        approval_status: dbValue(source.approval_status, "Pending"),
+        notes: dbValue(source.notes),
+        terms_conditions: dbValue(source.terms_conditions),
+        subtotal: dbValue(source.subtotal, 0),
+        discount_type: dbValue(source.discount_type),
+        discount_value: dbValue(source.discount_value, 0),
+        discount_total: dbValue(source.discount_total, 0),
+        taxable_total: dbValue(source.taxable_total, 0),
+        tax_total: dbValue(source.tax_total, 0),
+        freight_amount: dbValue(source.freight_amount, 0),
+        packing_amount: dbValue(source.packing_amount, 0),
+        other_charges: dbValue(source.other_charges, 0),
+        round_off: dbValue(source.round_off, 0),
+        grand_total: dbValue(source.grand_total, 0),
+        created_by: isCreate ? createdBy : dbValue(source.created_by),
+        updated_by: updatedBy,
+        created_at: isCreate ? dateNow : dbValue(source.created_at),
+        updated_at: dateNow,
+        is_active: dbValue(source.is_active, "Y")
+    };
+}
+
+function buildSalesOrderItem(item, salesOrderId, index, dateNow) {
+    const source = item || {};
+    const cgstAmount = dbValue(source.cgst_amount, 0);
+    const sgstAmount = dbValue(source.sgst_amount, 0);
+    const igstAmount = dbValue(source.igst_amount, 0);
+
+    return {
+        sales_order_id: salesOrderId,
+        quotation_item_id: dbValue(source.quotation_item_id),
+        line_no: dbValue(source.line_no, index + 1),
+        material_id: dbValue(source.material_id),
+        material_code: dbValue(source.material_code),
+        item_name: dbValue(source.item_name),
+        material_type: dbValue(source.material_type),
+        item_description: dbValue(source.item_description),
+        hsn_sac_code: dbValue(source.hsn_sac_code),
+        qty: dbValue(source.qty, 0),
+        delivered_qty: dbValue(source.delivered_qty, 0),
+        invoiced_qty: dbValue(source.invoiced_qty, 0),
+        unit: dbValue(source.unit),
+        uom_id: dbValue(source.uom_id),
+        rate: dbValue(source.rate, 0),
+        gross_amount: dbValue(source.gross_amount, 0),
+        discount_type: dbValue(source.discount_type),
+        discount_value: dbValue(source.discount_value, 0),
+        discount_amount: dbValue(source.discount_amount, 0),
+        taxable_amount: dbValue(source.taxable_amount, 0),
+        tax_id: dbValue(source.tax_id),
+        tax_percent: dbValue(source.tax_percent, 0),
+        cgst_percent: dbValue(source.cgst_percent, 0),
+        cgst_amount: cgstAmount,
+        sgst_percent: dbValue(source.sgst_percent, 0),
+        sgst_amount: sgstAmount,
+        igst_percent: dbValue(source.igst_percent, 0),
+        igst_amount: igstAmount,
+        tax_amount: dbValue(source.tax_amount, Number(cgstAmount || 0) + Number(sgstAmount || 0) + Number(igstAmount || 0)),
+        line_total: dbValue(source.line_total, 0),
+        warehouse_id: dbValue(source.warehouse_id),
+        delivery_date: dbValue(source.delivery_date),
+        item_status: dbValue(source.item_status, "Open"),
+        created_at: dateNow,
+        updated_at: dateNow,
+        is_active: dbValue(source.is_active, "Y")
+    };
+}
+
+function insertSalesOrderItems(connection, salesOrderId, items, dateNow, callback) {
+    if (!items || items.length === 0) {
+        return callback();
+    }
+
+    const itemSql = `INSERT INTO sales_order_items (${SALES_ORDER_ITEM_COLUMNS.join(", ")}) VALUES ?`;
+    const itemValues = items.map((item, idx) => {
+        const row = buildSalesOrderItem(item, salesOrderId, idx, dateNow);
+        return SALES_ORDER_ITEM_COLUMNS.map(col => row[col]);
+    });
+
+    connection.query(itemSql, [itemValues], callback);
+}
+
+// ==================================================================
+// GET /salesorder/list
+// ==================================================================
+app.get("/salesorder/list", verifyToken, (req, res) => {
+    const sql = `
+        SELECT
+            sales_order_id,
+            sales_order_no,
+            sales_order_date,
+            quotation_id,
+            quotation_no,
+            customer_id,
+            customer_name,
+            customer_contact,
+            subject,
+            currency,
+            status,
+            approval_status,
+            delivery_date,
+            grand_total,
+            created_at,
+            updated_at,
+            is_active
+        FROM sales_orders
+        WHERE is_active = 'Y'
+        ORDER BY sales_order_id DESC
+    `;
+
+    pool.query(sql, (err, rows) => {
+        if (err) {
+            console.error("GET /salesorder/list error:", err);
+            return res.status(500).json({ error: "Failed to fetch sales orders" });
+        }
+        res.json(rows);
+    });
+});
+
+// ==================================================================
+// GET /salesorder/nextno
+// ==================================================================
+app.get("/salesorder/nextno", verifyToken, (req, res) => {
+    const sql = `SELECT sales_order_no FROM sales_orders ORDER BY sales_order_id DESC LIMIT 1`;
+
+    pool.query(sql, (err, rows) => {
+        if (err) {
+            console.error("GET /salesorder/nextno error:", err);
+            return res.status(500).json({ error: "Failed to get next sales order number" });
+        }
+
+        let nextNo = "SO-0001";
+
+        if (rows.length > 0 && rows[0].sales_order_no) {
+            const parts = rows[0].sales_order_no.split("-");
+            if (parts.length === 2) {
+                const num = parseInt(parts[1], 10) + 1;
+                nextNo = "SO-" + String(num).padStart(4, "0");
+            }
+        }
+
+        res.json({ sales_order_no: nextNo });
+    });
+});
+
+// ==================================================================
+// GET /salesorder/:id
+// ==================================================================
+app.get("/salesorder/:id", verifyToken, (req, res) => {
+    const salesOrderId = req.params.id;
+    const headerSql = `SELECT * FROM sales_orders WHERE sales_order_id = ?`;
+    const itemsSql = `SELECT * FROM sales_order_items WHERE sales_order_id = ? AND is_active = 'Y' ORDER BY line_no ASC`;
+
+    pool.query(headerSql, [salesOrderId], (err, headerRows) => {
+        if (err) {
+            console.error("GET /salesorder/:id header error:", err);
+            return res.status(500).json({ error: "Failed to fetch sales order" });
+        }
+        if (!headerRows.length) {
+            return res.status(404).json({ error: "Sales order not found" });
+        }
+
+        pool.query(itemsSql, [salesOrderId], (itemErr, itemRows) => {
+            if (itemErr) {
+                console.error("GET /salesorder/:id items error:", itemErr);
+                return res.status(500).json({ error: "Failed to fetch sales order items" });
+            }
+
+            res.json({
+                header: headerRows[0],
+                items: itemRows
+            });
+        });
+    });
+});
+
+// ==================================================================
+// POST /salesorder/create
+// ==================================================================
+app.post("/salesorder/create", verifyToken, (req, res) => {
+    const { header, items } = req.body;
+    const dateNow = now();
+    const headerRow = buildSalesOrderHeader(header, dateNow, true);
+    const headerSql = `INSERT INTO sales_orders (${SALES_ORDER_HEADER_COLUMNS.join(", ")}) VALUES (${SALES_ORDER_HEADER_COLUMNS.map(() => "?").join(", ")})`;
+    const headerValues = SALES_ORDER_HEADER_COLUMNS.map(col => headerRow[col]);
+
+    pool.getConnection((connErr, connection) => {
+        if (connErr) {
+            console.error("Sales order connection error:", connErr);
+            return res.status(500).json({ error: "Database connection failed" });
+        }
+
+        connection.beginTransaction((txErr) => {
+            if (txErr) {
+                connection.release();
+                return res.status(500).json({ error: "Transaction start failed" });
+            }
+
+            connection.query(headerSql, headerValues, (err, headerResult) => {
+                if (err) {
+                    return connection.rollback(() => {
+                        connection.release();
+                        console.error("Insert sales order header error:", err);
+                        res.status(500).json({ error: "Failed to create sales order" });
+                    });
+                }
+
+                const salesOrderId = headerResult.insertId;
+
+                insertSalesOrderItems(connection, salesOrderId, items, dateNow, (itemErr) => {
+                    if (itemErr) {
+                        return connection.rollback(() => {
+                            connection.release();
+                            console.error("Insert sales order items error:", itemErr);
+                            res.status(500).json({ error: "Failed to create sales order items" });
+                        });
+                    }
+
+                    connection.commit((commitErr) => {
+                        connection.release();
+                        if (commitErr) return res.status(500).json({ error: "Commit failed" });
+                        res.json({ success: true, sales_order_id: salesOrderId });
+                    });
+                });
+            });
+        });
+    });
+});
+
+// ==================================================================
+// PUT /salesorder/update/:id
+// ==================================================================
+app.put("/salesorder/update/:id", verifyToken, (req, res) => {
+    const salesOrderId = req.params.id;
+    const { header, items } = req.body;
+    const dateNow = now();
+    const headerRow = buildSalesOrderHeader(header, dateNow, false);
+    const updateColumns = SALES_ORDER_HEADER_COLUMNS.filter(col => !["created_by", "created_at"].includes(col));
+    const updateHeaderSql = `UPDATE sales_orders SET ${updateColumns.map(col => `${col} = ?`).join(", ")} WHERE sales_order_id = ?`;
+    const headerValues = [...updateColumns.map(col => headerRow[col]), salesOrderId];
+
+    pool.getConnection((connErr, connection) => {
+        if (connErr) {
+            return res.status(500).json({ error: "Database connection failed" });
+        }
+
+        connection.beginTransaction((txErr) => {
+            if (txErr) {
+                connection.release();
+                return res.status(500).json({ error: "Transaction start failed" });
+            }
+
+            connection.query(updateHeaderSql, headerValues, (err) => {
+                if (err) {
+                    return connection.rollback(() => {
+                        connection.release();
+                        console.error("Update sales order header error:", err);
+                        res.status(500).json({ error: "Failed to update sales order" });
+                    });
+                }
+
+                const softDeleteSql = `UPDATE sales_order_items SET is_active = 'N', updated_at = ? WHERE sales_order_id = ?`;
+                connection.query(softDeleteSql, [dateNow, salesOrderId], (delErr) => {
+                    if (delErr) {
+                        return connection.rollback(() => {
+                            connection.release();
+                            console.error("Soft delete sales order items error:", delErr);
+                            res.status(500).json({ error: "Failed to clear old sales order items" });
+                        });
+                    }
+
+                    insertSalesOrderItems(connection, salesOrderId, items, dateNow, (itemErr) => {
+                        if (itemErr) {
+                            return connection.rollback(() => {
+                                connection.release();
+                                console.error("Insert updated sales order items error:", itemErr);
+                                res.status(500).json({ error: "Failed to insert updated sales order items" });
+                            });
+                        }
+
+                        connection.commit((commitErr) => {
+                            connection.release();
+                            if (commitErr) return res.status(500).json({ error: "Commit failed" });
+                            res.json({ success: true, sales_order_id: salesOrderId });
+                        });
+                    });
+                });
+            });
+        });
+    });
+});
+
+// ==================================================================
+// PATCH /salesorder/status/:id
+// ==================================================================
+app.patch("/salesorder/status/:id", verifyToken, (req, res) => {
+    const salesOrderId = req.params.id;
+    const dateNow = now();
+    const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;
+
+    const sql = `
+        UPDATE sales_orders
+        SET status = COALESCE(?, status),
+            approval_status = COALESCE(?, approval_status),
+            updated_by = ?,
+            updated_at = ?
+        WHERE sales_order_id = ?
+    `;
+
+    pool.query(sql, [req.body.status || null, req.body.approval_status || null, updatedBy, dateNow, salesOrderId], (err, result) => {
+        if (err) {
+            console.error("PATCH /salesorder/status error:", err);
+            return res.status(500).json({ error: "Failed to update sales order status" });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: "Sales order not found" });
+        }
+        res.json({ success: true });
+    });
+});
+
+// ==================================================================
+// DELETE /salesorder/:id
+// ==================================================================
+app.delete("/salesorder/:id", verifyToken, (req, res) => {
+    const salesOrderId = req.params.id;
+    const dateNow = now();
+    const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;
+
+    pool.getConnection((connErr, connection) => {
+        if (connErr) {
+            return res.status(500).json({ error: "Database connection failed" });
+        }
+
+        connection.beginTransaction((txErr) => {
+            if (txErr) {
+                connection.release();
+                return res.status(500).json({ error: "Transaction start failed" });
+            }
+
+            const headerSql = `UPDATE sales_orders SET is_active = 'N', updated_by = ?, updated_at = ? WHERE sales_order_id = ?`;
+            connection.query(headerSql, [updatedBy, dateNow, salesOrderId], (headerErr, result) => {
+                if (headerErr) {
+                    return connection.rollback(() => {
+                        connection.release();
+                        console.error("DELETE /salesorder/:id header error:", headerErr);
+                        res.status(500).json({ error: "Failed to delete sales order" });
+                    });
+                }
+                if (result.affectedRows === 0) {
+                    return connection.rollback(() => {
+                        connection.release();
+                        res.status(404).json({ error: "Sales order not found" });
+                    });
+                }
+
+                const itemSql = `UPDATE sales_order_items SET is_active = 'N', updated_at = ? WHERE sales_order_id = ?`;
+                connection.query(itemSql, [dateNow, salesOrderId], (itemErr) => {
+                    if (itemErr) {
+                        return connection.rollback(() => {
+                            connection.release();
+                            console.error("DELETE /salesorder/:id items error:", itemErr);
+                            res.status(500).json({ error: "Failed to delete sales order items" });
+                        });
+                    }
+
+                    connection.commit((commitErr) => {
+                        connection.release();
+                        if (commitErr) return res.status(500).json({ error: "Commit failed" });
+                        res.json({ success: true });
+                    });
+                });
+            });
+        });
+    });
+});
+
+//-----------------------------------------sales order end ----------------------------------------------
 
 app.get('/feature/getFeature', verifyToken, (req,res) => {
 

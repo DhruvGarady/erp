@@ -127,8 +127,10 @@
         <br>
         <ul class="nav nav-tabs" id="materialTab" role="tablist">
           <li class="nav-item"><a class="nav-link active" id="basic-tab" data-toggle="tab" href="#basic" role="tab">Basic</a></li>
-          <li class="nav-item"><a class="nav-link" id="uom-tab" data-toggle="tab" href="#uom" role="tab">UOM & Accounting</a></li>
-          <li class="nav-item"><a class="nav-link" id="planning-tab" data-toggle="tab" href="#planning" role="tab">Planning</a></li>
+          <li class="nav-item"><a class="nav-link" id="uom-tab" data-toggle="tab" href="#uom" role="tab">UOM & Tax</a></li>
+          <li class="nav-item"><a class="nav-link" id="sales-tab" data-toggle="tab" href="#sales" role="tab">Sales</a></li>
+          <li class="nav-item"><a class="nav-link" id="procurement-tab" data-toggle="tab" href="#procurement" role="tab">Procurement</a></li>
+          <li class="nav-item"><a class="nav-link" id="planning-tab" data-toggle="tab" href="#planning" role="tab">Inventory & Costing</a></li>
         </ul>
 
         <div class="tab-content border" id="materialTabContent">
@@ -180,7 +182,25 @@
                   </div>
                 </td>
                 <td></td>
-                <td colspan="5">
+                <td>
+                  <div class="form-group">
+                    Brand
+                    <input type="text" id="brand" name="brand">
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Model No
+                    <input type="text" id="model_no" name="model_no">
+                  </div>
+                </td>
+                <td></td>
+                <td></td>
+              </tr>
+
+              <tr>
+                <td colspan="7">
                   <div class="form-group">
                     Description
                     <textarea id="material_description" name="material_description" rows="2"></textarea>
@@ -246,6 +266,139 @@
                 <td></td>
                 <td></td>
               </tr>
+
+              <tr>
+                <td>
+                  <div class="form-group">
+                    Tax Classification
+                    <select id="tax_classification" name="tax_classification">
+                      <option value="">Select</option>
+                      <option value="TAXABLE">TAXABLE</option>
+                      <option value="EXEMPT">EXEMPT</option>
+                      <option value="NIL RATED">NIL RATED</option>
+                      <option value="ZERO RATED">ZERO RATED</option>
+                    </select>
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    GST Applicable
+                    <select id="gst_applicable" name="gst_applicable">
+                      <option value="">Select</option>
+                      <option value="Y">Yes</option>
+                      <option value="N">No</option>
+                    </select>
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Tax Inclusive
+                    <select id="is_tax_inclusive" name="is_tax_inclusive">
+                      <option value="">Select</option>
+                      <option value="Y">Yes</option>
+                      <option value="N">No</option>
+                    </select>
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Cess %
+                    <input type="number" id="cess_percent" name="cess_percent" step="0.01">
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="tab-pane fade" id="sales" role="tabpanel" style="margin:17px;">
+            <table width="100%">
+              <tr>
+                <td width="20%">
+                  <div class="form-group">
+                    Sales Rate
+                    <input type="number" id="sales_rate" name="sales_rate" step="0.01">
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Min Sale Qty
+                    <input type="number" id="min_sale_qty" name="min_sale_qty" step="0.01">
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Max Sale Qty
+                    <input type="number" id="max_sale_qty" name="max_sale_qty" step="0.01">
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Discount Allowed
+                    <select id="discount_allowed" name="discount_allowed">
+                      <option value="">Select</option>
+                      <option value="Y">Yes</option>
+                      <option value="N">No</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <div class="form-group">
+                    Default Discount %
+                    <input type="number" id="default_discount_percent" name="default_discount_percent" step="0.01">
+                  </div>
+                </td>
+                <td></td>
+                <td colspan="5"></td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="tab-pane fade" id="procurement" role="tabpanel" style="margin:17px;">
+            <table width="100%">
+              <tr>
+                <td width="20%">
+                  <div class="form-group">
+                    Preferred Vendor
+                    <select id="preferred_vendor_id" name="preferred_vendor_id"></select>
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Lead Time Days
+                    <input type="number" id="lead_time_days" name="lead_time_days">
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    MOQ
+                    <input type="number" id="moq" name="moq" step="0.01">
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Procurement Type
+                    <select id="procurement_type" name="procurement_type">
+                      <option value="">Select</option>
+                      <option value="PURCHASE">PURCHASE</option>
+                      <option value="IN-HOUSE">IN-HOUSE</option>
+                      <option value="SUBCONTRACT">SUBCONTRACT</option>
+                      <option value="NONE">NONE</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
             </table>
           </div>
 
@@ -273,7 +426,94 @@
                   </div>
                 </td>
                 <td width="5%"></td>
-                <td width="20%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Safety Stock
+                    <input type="number" id="safety_stock" name="safety_stock" step="0.01">
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <div class="form-group">
+                    Storage Condition
+                    <input type="text" id="storage_condition" name="storage_condition">
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Shelf Life Days
+                    <input type="number" id="shelf_life_days" name="shelf_life_days">
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Default Warehouse
+                    <select id="default_warehouse_id" name="default_warehouse_id"></select>
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Costing Method
+                    <select id="costing_method" name="costing_method">
+                      <option value="">Select</option>
+                      <option value="STANDARD">STANDARD</option>
+                      <option value="MOVING_AVERAGE">MOVING AVERAGE</option>
+                      <option value="FIFO">FIFO</option>
+                      <option value="WEIGHTED_AVERAGE">WEIGHTED AVERAGE</option>
+                    </select>
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <div class="form-group">
+                    Weight
+                    <input type="number" id="weight" name="weight" step="0.001">
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Length
+                    <input type="number" id="length" name="length" step="0.001">
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Width
+                    <input type="number" id="width" name="width" step="0.001">
+                  </div>
+                </td>
+                <td></td>
+                <td>
+                  <div class="form-group">
+                    Height
+                    <input type="number" id="height" name="height" step="0.001">
+                  </div>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <div class="form-group">
+                    Dimension UOM
+                    <select id="dimension_uom" name="dimension_uom">
+                      <option value="">Select</option>
+                      <option value="MM">MM</option>
+                      <option value="CM">CM</option>
+                      <option value="M">M</option>
+                      <option value="INCH">INCH</option>
+                    </select>
+                  </div>
+                </td>
+                <td colspan="6"></td>
               </tr>
             </table>
           </div>

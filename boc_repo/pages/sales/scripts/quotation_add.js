@@ -4,6 +4,8 @@ var currencies = [];
 var uoms = [];
 var materials = [];
 var taxes = [];
+var paymentTerms = [];
+var warehouses = [];
 var quotationItems = [];
 var quotationItemsTemplate;
 
@@ -21,19 +23,27 @@ $(document).ready(function () {
     onLineMaterialChange($(this).closest("tr"));
   });
 
-  $("#quotationItemsContainer").on("input change", ".quotation-line-input, .lineUnit", function () {
+  $("#quotationItemsContainer").on("change", ".lineTax", function () {
+    splitLineTax($(this).closest("tr"));
+  });
+
+  $("#quotationItemsContainer").on("input change", ".quotation-line-input, .quotation-line-select", function () {
     syncQuotationItemRows();
     calculateTotals();
   });
 
-  $("#quote_discount_amount").on("input change", function () {
+  $("#discount_type, #discount_value, #other_charges, #freight_amount, #packing_amount, #round_off").on("input change", function () {
     calculateTotals();
   });
+
+  $("#currency_id").on("change", onCurrencyChange);
 
   loadLookups()
     .done(function () {
       renderCustomerOptions();
       renderCurrencyOptions();
+      renderPaymentTermOptions();
+      renderWarehouseOptions();
       renderQuotationItems();
 
       if (editQuotationId) {
@@ -43,6 +53,9 @@ $(document).ready(function () {
         $("#pageTitle").text("Add Quotation Information:");
         $("#quotation_date").val(todayString());
         $("#status").val("Draft");
+        $("#approval_status").val("Pending");
+        $("#revision_no").val(0);
+        $("#exchange_rate").val(1);
         loadNextQuotationNo();
         addQuotationItem();
       }
@@ -76,13 +89,17 @@ function loadLookups() {
     getMasterList("mst_currency"),
     getMasterList("mst_uom"),
     getMasterList("mst_material"),
-    getMasterList("mst_tax")
-  ).done(function (customerRows, currencyRows, uomRows, materialRows, taxRows) {
+    getMasterList("mst_tax"),
+    getMasterList("mst_payment_terms"),
+    getMasterList("mst_warehouse")
+  ).done(function (customerRows, currencyRows, uomRows, materialRows, taxRows, paymentTermRows, warehouseRows) {
     customers = customerRows || [];
     currencies = currencyRows || [];
     uoms = uomRows || [];
     materials = materialRows || [];
     taxes = taxRows || [];
+    paymentTerms = paymentTermRows || [];
+    warehouses = warehouseRows || [];
   });
 }
 
@@ -95,24 +112,58 @@ function renderCustomerOptions(selectedCustomerId) {
   $("#customer_id").html(html);
 }
 
-function renderCurrencyOptions(selectedCurrency) {
+function renderCurrencyOptions(selectedCurrencyId, selectedCurrencyCode) {
   var html = '<option value="">Select</option>';
   _.each(currencies, function (currency) {
     var currencyCode = currency.currency_code || currency.currency_name || "";
-    var selected = String(selectedCurrency || "") === String(currencyCode) ? " selected" : "";
-    html += '<option value="' + currencyCode + '"' + selected + ">" + currencyCode + "</option>";
+    var selected = String(selectedCurrencyId || "") === String(currency.currency_id) || String(selectedCurrencyCode || "") === String(currencyCode) ? " selected" : "";
+    html += '<option value="' + currency.currency_id + '"' + selected + ">" + currencyCode + "</option>";
   });
-  $("#currency").html(html);
+  $("#currency_id").html(html);
+  onCurrencyChange();
+}
+
+function renderPaymentTermOptions(selectedPaymentTermId) {
+  var html = '<option value="">Select</option>';
+  _.each(paymentTerms, function (term) {
+    var termText = (term.payment_term_code || term.payment_terms_code || "") + (term.payment_term_name || term.payment_terms_name ? " - " : "") + (term.payment_term_name || term.payment_terms_name || "");
+    var selected = String(selectedPaymentTermId || "") === String(term.payment_term_id || term.payment_terms_id) ? " selected" : "";
+    html += '<option value="' + (term.payment_term_id || term.payment_terms_id) + '"' + selected + ">" + termText + "</option>";
+  });
+  $("#payment_term_id").html(html);
+}
+
+function renderWarehouseOptions(selectedWarehouseId) {
+  var html = '<option value="">Select</option>';
+  _.each(warehouses, function (warehouse) {
+    var warehouseText = (warehouse.warehouse_code ? warehouse.warehouse_code + " - " : "") + (warehouse.warehouse_name || "");
+    var selected = String(selectedWarehouseId || "") === String(warehouse.warehouse_id) ? " selected" : "";
+    html += '<option value="' + warehouse.warehouse_id + '"' + selected + ">" + warehouseText + "</option>";
+  });
+  $("#warehouse_id").html(html);
 }
 
 function onCustomerChange() {
   var customer = findCustomer($("#customer_id").val());
   if (!customer) {
     $("#customer_contact").val("");
+    $("#billing_address").val("");
+    $("#shipping_address").val("");
     return;
   }
 
   $("#customer_contact").val(customer.contact_person || customer.phone || customer.email || "");
+  $("#billing_address").val(customer.billing_address || customer.address || "");
+  $("#shipping_address").val(customer.shipping_address || customer.billing_address || customer.address || "");
+  $("#payment_term_id").val(customer.payment_term_id || customer.payment_terms_id || "");
+}
+
+function onCurrencyChange() {
+  var currency = findCurrency($("#currency_id").val());
+  $("#currency").val(currency ? (currency.currency_code || currency.currency_name || "") : "");
+  if (currency && !$("#exchange_rate").val()) {
+    $("#exchange_rate").val(currency.exchange_rate || 1);
+  }
 }
 
 function findCustomer(customerId) {
@@ -124,6 +175,18 @@ function findCustomer(customerId) {
 function findMaterial(materialId) {
   return _.find(materials, function (item) {
     return String(item.material_id) === String(materialId);
+  });
+}
+
+function findCurrency(currencyId) {
+  return _.find(currencies, function (item) {
+    return String(item.currency_id) === String(currencyId);
+  });
+}
+
+function findCurrencyByCode(currencyCode) {
+  return _.find(currencies, function (item) {
+    return String(item.currency_code || item.currency_name || "").toLowerCase() === String(currencyCode || "").toLowerCase();
   });
 }
 
@@ -151,6 +214,23 @@ function getUomValue(uomId) {
   return uom ? (uom.uom_code || uom.uom_name || "") : "";
 }
 
+function findUom(uomId) {
+  return _.find(uoms, function (item) {
+    return String(item.uom_id) === String(uomId);
+  });
+}
+
+function findUomByValue(unitValue) {
+  return _.find(uoms, function (item) {
+    return String(item.uom_code || item.uom_name || "").toLowerCase() === String(unitValue || "").toLowerCase();
+  });
+}
+
+function getUomText(uomId) {
+  var uom = findUom(uomId);
+  return uom ? (uom.uom_code || uom.uom_name || "") : "";
+}
+
 function loadNextQuotationNo() {
   $.ajax({
     type: "GET",
@@ -169,15 +249,32 @@ function addQuotationItem() {
   quotationItems.push({
     line_no: quotationItems.length + 1,
     material_id: null,
+    material_code: "",
+    material_type: "",
     item_name: "",
-    part_code: "",
     hsn_sac_code: "",
     item_description: "",
     qty: 1,
     unit: "",
+    uom_id: null,
     rate: 0,
+    discount_type: "",
+    discount_value: 0,
+    discount_amount: 0,
+    gross_amount: 0,
+    taxable_amount: 0,
     discount_percent: 0,
     tax_percent: 0,
+    tax_id: null,
+    cgst_percent: 0,
+    cgst_amount: 0,
+    sgst_percent: 0,
+    sgst_amount: 0,
+    igst_percent: 0,
+    igst_amount: 0,
+    warehouse_id: cleanInt($("#warehouse_id").val(), null),
+    delivery_date: "",
+    item_status: "Open",
     line_total: 0,
     is_active: "Y"
   });
@@ -195,7 +292,8 @@ function onLineMaterialChange(row) {
   if (!material) {
     quotationItems[index].material_id = null;
     quotationItems[index].item_name = "";
-    quotationItems[index].part_code = "";
+    quotationItems[index].material_code = "";
+    quotationItems[index].material_type = "";
     quotationItems[index].hsn_sac_code = "";
     renderQuotationItems();
     return;
@@ -208,13 +306,23 @@ function onLineMaterialChange(row) {
 function applyMaterialDefaults(item, material) {
   item.material_id = cleanInt(material.material_id, null);
   item.item_name = material.material_name || "";
-  item.part_code = material.material_code || "";
+  item.material_code = material.material_code || "";
+  item.material_type = material.material_type || "";
   item.hsn_sac_code = material.hsn_sac_code || "";
   item.item_description = material.material_description || "";
-  item.unit = getUomValue(material.sales_uom_id || material.base_uom_id) || item.unit || "";
-  item.rate = cleanDecimal(material.standard_rate, item.rate || 0);
+  item.uom_id = cleanInt(material.sales_uom_id || material.base_uom_id, null);
+  item.unit = getUomValue(item.uom_id) || item.unit || "";
+  item.rate = cleanDecimal(material.sales_rate, cleanDecimal(material.standard_rate, item.rate || 0));
+  item.tax_id = cleanInt(material.tax_id, null);
   item.tax_percent = getTaxPercent(material.tax_id);
-  item.line_total = calculateLineTotal(item);
+  item.cgst_percent = item.tax_percent ? roundMoney(item.tax_percent / 2) : 0;
+  item.sgst_percent = item.tax_percent ? roundMoney(item.tax_percent / 2) : 0;
+  item.igst_percent = 0;
+  item.discount_type = material.discount_allowed === "Y" && cleanDecimal(material.default_discount_percent, 0) > 0 ? "PERCENT" : "";
+  item.discount_value = item.discount_type === "PERCENT" ? cleanDecimal(material.default_discount_percent, 0) : 0;
+  item.discount_percent = item.discount_type === "PERCENT" ? item.discount_value : 0;
+  item.warehouse_id = cleanInt(material.default_warehouse_id, cleanInt($("#warehouse_id").val(), null));
+  calculateLineAmounts(item);
 }
 
 function deleteQuotationItem(index) {
@@ -230,17 +338,28 @@ function syncQuotationItemRows() {
 
     var materialId = cleanInt($(this).find(".lineMaterial").val(), null);
     var material = findMaterial(materialId);
+    var uomId = cleanInt($(this).find(".lineUnit").val(), null);
     quotationItems[index].material_id = materialId;
     quotationItems[index].item_name = material ? material.material_name : quotationItems[index].item_name;
-    quotationItems[index].part_code = material ? (material.material_code || "") : quotationItems[index].part_code;
+    quotationItems[index].material_code = material ? (material.material_code || "") : $.trim($(this).find(".lineMaterialCode").val());
+    quotationItems[index].material_type = material ? (material.material_type || "") : $.trim($(this).find(".lineMaterialType").val());
     quotationItems[index].hsn_sac_code = material ? (material.hsn_sac_code || "") : quotationItems[index].hsn_sac_code;
     quotationItems[index].item_description = $.trim($(this).find(".lineDescription").val());
     quotationItems[index].qty = cleanDecimal($(this).find(".lineQty").val(), 0);
-    quotationItems[index].unit = $.trim($(this).find(".lineUnit").val());
+    quotationItems[index].uom_id = uomId;
+    quotationItems[index].unit = getUomText(uomId);
     quotationItems[index].rate = cleanDecimal($(this).find(".lineRate").val(), 0);
-    quotationItems[index].discount_percent = cleanDecimal($(this).find(".lineDiscount").val(), 0);
+    quotationItems[index].discount_type = $(this).find(".lineDiscountType").val();
+    quotationItems[index].discount_value = cleanDecimal($(this).find(".lineDiscountValue").val(), 0);
     quotationItems[index].tax_percent = cleanDecimal($(this).find(".lineTax").val(), 0);
-    quotationItems[index].line_total = calculateLineTotal(quotationItems[index]);
+    quotationItems[index].cgst_percent = cleanDecimal($(this).find(".lineCgstPercent").val(), 0);
+    quotationItems[index].sgst_percent = cleanDecimal($(this).find(".lineSgstPercent").val(), 0);
+    quotationItems[index].igst_percent = cleanDecimal($(this).find(".lineIgstPercent").val(), 0);
+    quotationItems[index].warehouse_id = cleanInt($(this).find(".lineWarehouse").val(), null);
+    quotationItems[index].delivery_date = $(this).find(".lineDeliveryDate").val() || null;
+    quotationItems[index].item_status = $(this).find(".lineItemStatus").val() || "Open";
+    quotationItems[index].tax_id = material ? cleanInt(material.tax_id, null) : quotationItems[index].tax_id;
+    calculateLineAmounts(quotationItems[index]);
   });
 }
 
@@ -253,6 +372,7 @@ function renderQuotationItems() {
     items: quotationItems || [],
     materials: materials || [],
     uoms: uoms || [],
+    warehouses: warehouses || [],
     formatAmount: formatAmount
   }));
   $("#quotationItemsContainer").trigger("create");
@@ -261,85 +381,148 @@ function renderQuotationItems() {
 function syncLineNumbers() {
   _.each(quotationItems, function (item, index) {
     item.line_no = index + 1;
-    item.line_total = calculateLineTotal(item);
+    calculateLineAmounts(item);
   });
 }
 
-function calculateLineTotal(item) {
+function splitLineTax(row) {
+  var taxPercent = cleanDecimal(row.find(".lineTax").val(), 0);
+  row.find(".lineCgstPercent").val(roundMoney(taxPercent / 2));
+  row.find(".lineSgstPercent").val(roundMoney(taxPercent / 2));
+  row.find(".lineIgstPercent").val(0);
+}
+
+function calculateLineAmounts(item) {
   var qty = Number(item.qty || 0);
   var rate = Number(item.rate || 0);
-  var discountPercent = Number(item.discount_percent || 0);
-  var taxPercent = Number(item.tax_percent || 0);
+  var discountType = item.discount_type || "";
+  var discountValue = Number(item.discount_value || 0);
   var gross = qty * rate;
-  var discountAmount = gross * discountPercent / 100;
+  var discountAmount = 0;
+
+  if (discountType === "PERCENT") {
+    discountAmount = gross * discountValue / 100;
+    item.discount_percent = discountValue;
+  } else if (discountType === "AMOUNT") {
+    discountAmount = discountValue;
+    item.discount_percent = gross ? roundMoney(discountAmount / gross * 100) : 0;
+  } else {
+    item.discount_percent = 0;
+  }
+
+  if (discountAmount > gross) {
+    discountAmount = gross;
+  }
+
   var taxableAmount = gross - discountAmount;
-  var taxAmount = taxableAmount * taxPercent / 100;
-  return roundMoney(taxableAmount + taxAmount);
+  var cgstAmount = taxableAmount * Number(item.cgst_percent || 0) / 100;
+  var sgstAmount = taxableAmount * Number(item.sgst_percent || 0) / 100;
+  var igstAmount = taxableAmount * Number(item.igst_percent || 0) / 100;
+  var taxAmount = cgstAmount + sgstAmount + igstAmount;
+
+  item.gross_amount = roundMoney(gross);
+  item.discount_amount = roundMoney(discountAmount);
+  item.taxable_amount = roundMoney(taxableAmount);
+  item.cgst_amount = roundMoney(cgstAmount);
+  item.sgst_amount = roundMoney(sgstAmount);
+  item.igst_amount = roundMoney(igstAmount);
+  item.tax_percent = roundMoney(Number(item.cgst_percent || 0) + Number(item.sgst_percent || 0) + Number(item.igst_percent || 0));
+  item.line_total = roundMoney(taxableAmount + taxAmount);
+
+  return item;
+}
+
+function calculateLineTotal(item) {
+  return calculateLineAmounts(item).line_total;
 }
 
 function calculateTotals() {
   var subtotal = 0;
   var lineDiscountTotal = 0;
+  var taxableBeforeHeaderDiscount = 0;
   var taxTotal = 0;
-  var lineGrandTotal = 0;
 
   _.each(quotationItems, function (item) {
-    var qty = Number(item.qty || 0);
-    var rate = Number(item.rate || 0);
-    var discountPercent = Number(item.discount_percent || 0);
-    var taxPercent = Number(item.tax_percent || 0);
-    var gross = qty * rate;
-    var discountAmount = gross * discountPercent / 100;
-    var taxableAmount = gross - discountAmount;
-    var taxAmount = taxableAmount * taxPercent / 100;
-
-    subtotal += gross;
-    lineDiscountTotal += discountAmount;
-    taxTotal += taxAmount;
-    lineGrandTotal += taxableAmount + taxAmount;
-    item.line_total = roundMoney(taxableAmount + taxAmount);
+    calculateLineAmounts(item);
+    subtotal += Number(item.gross_amount || 0);
+    lineDiscountTotal += Number(item.discount_amount || 0);
+    taxableBeforeHeaderDiscount += Number(item.taxable_amount || 0);
+    taxTotal += Number(item.cgst_amount || 0) + Number(item.sgst_amount || 0) + Number(item.igst_amount || 0);
   });
 
-  var quoteDiscount = cleanDecimal($("#quote_discount_amount").val(), 0);
-  quoteDiscount = quoteDiscount < 0 ? 0 : quoteDiscount;
+  var headerDiscount = calculateHeaderDiscount(taxableBeforeHeaderDiscount);
 
-  if (quoteDiscount > lineGrandTotal) {
-    quoteDiscount = lineGrandTotal;
-    $("#quote_discount_amount").val(roundMoney(quoteDiscount));
+  if (headerDiscount > taxableBeforeHeaderDiscount) {
+    headerDiscount = taxableBeforeHeaderDiscount;
+    if ($("#discount_type").val() === "AMOUNT") {
+      $("#discount_value").val(roundMoney(headerDiscount));
+    }
   }
 
-  var discountTotal = lineDiscountTotal + quoteDiscount;
-  var grandTotal = lineGrandTotal - quoteDiscount;
+  var discountTotal = lineDiscountTotal + headerDiscount;
+  var taxableTotal = taxableBeforeHeaderDiscount - headerDiscount;
+  var otherCharges = cleanDecimal($("#other_charges").val(), 0);
+  var freightAmount = cleanDecimal($("#freight_amount").val(), 0);
+  var packingAmount = cleanDecimal($("#packing_amount").val(), 0);
+  var roundOff = cleanDecimal($("#round_off").val(), 0);
+  var grandTotal = taxableTotal + taxTotal + otherCharges + freightAmount + packingAmount + roundOff;
 
   $("#subtotalLabel").text(formatAmount(subtotal));
   $("#lineDiscountTotalLabel").text(formatAmount(lineDiscountTotal));
   $("#discountTotalLabel").text(formatAmount(discountTotal));
+  $("#taxableTotalLabel").text(formatAmount(taxableTotal));
   $("#taxTotalLabel").text(formatAmount(taxTotal));
   $("#grandTotalLabel").text(formatAmount(grandTotal));
 
   $("#quotationItemsContainer tr[data-index]").each(function () {
     var index = parseInt($(this).attr("data-index"), 10);
     if (quotationItems[index]) {
+      $(this).find(".lineDiscountAmountLabel").text(formatAmount(quotationItems[index].discount_amount));
+      $(this).find(".lineGrossAmountLabel").text(formatAmount(quotationItems[index].gross_amount));
+      $(this).find(".lineTaxableAmountLabel").text(formatAmount(quotationItems[index].taxable_amount));
+      $(this).find(".lineCgstAmountLabel").text(formatAmount(quotationItems[index].cgst_amount));
+      $(this).find(".lineSgstAmountLabel").text(formatAmount(quotationItems[index].sgst_amount));
+      $(this).find(".lineIgstAmountLabel").text(formatAmount(quotationItems[index].igst_amount));
       $(this).find(".lineTotalLabel").text(formatAmount(quotationItems[index].line_total));
     }
   });
 
   return {
     subtotal: roundMoney(subtotal),
+    discount_type: $("#discount_type").val(),
+    discount_value: cleanDecimal($("#discount_value").val(), 0),
     discount_total: roundMoney(discountTotal),
+    taxable_total: roundMoney(taxableTotal),
+    other_charges: roundMoney(otherCharges),
+    freight_amount: roundMoney(freightAmount),
+    packing_amount: roundMoney(packingAmount),
     tax_total: roundMoney(taxTotal),
-    grand_total: roundMoney(grandTotal)
+    grand_total: roundMoney(grandTotal),
+    round_off: roundMoney(roundOff)
   };
+}
+
+function calculateHeaderDiscount(taxableBase) {
+  var discountType = $("#discount_type").val();
+  var discountValue = cleanDecimal($("#discount_value").val(), 0);
+
+  if (discountType === "PERCENT") {
+    return roundMoney(taxableBase * discountValue / 100);
+  }
+
+  if (discountType === "AMOUNT") {
+    return roundMoney(discountValue);
+  }
+
+  return 0;
 }
 
 function calculateLineDiscountTotal(items) {
   var lineDiscountTotal = 0;
 
   _.each(items || [], function (item) {
-    var qty = Number(item.qty || 0);
-    var rate = Number(item.rate || 0);
-    var discountPercent = Number(item.discount_percent || 0);
-    lineDiscountTotal += qty * rate * discountPercent / 100;
+    calculateLineAmounts(item);
+    lineDiscountTotal += Number(item.discount_amount || 0);
   });
 
   return roundMoney(lineDiscountTotal);
@@ -358,32 +541,69 @@ function buildPayload() {
       customer_id: cleanInt($("#customer_id").val(), null),
       customer_name: customer ? customer.customer_name : "",
       customer_contact: $.trim($("#customer_contact").val()),
+      billing_address: $.trim($("#billing_address").val()),
+      shipping_address: $.trim($("#shipping_address").val()),
       valid_till: $("#valid_till").val() || null,
       reference_no: $.trim($("#reference_no").val()),
       subject: $.trim($("#subject").val()),
-      currency: $("#currency").val(),
+      currency: $.trim($("#currency").val()),
+      payment_term_id: cleanInt($("#payment_term_id").val(), null),
+      salesperson_id: cleanInt($("#salesperson_id").val(), null),
+      warehouse_id: cleanInt($("#warehouse_id").val(), null),
+      currency_id: cleanInt($("#currency_id").val(), null),
+      exchange_rate: cleanDecimal($("#exchange_rate").val(), 1),
       notes: $.trim($("#notes").val()),
       terms_conditions: $.trim($("#terms_conditions").val()),
       status: $("#status").val() || "Draft",
+      revision_no: cleanInt($("#revision_no").val(), 0),
+      approval_status: $("#approval_status").val() || "Pending",
+      reason: $.trim($("#reason").val()),
       subtotal: totals.subtotal,
+      discount_type: totals.discount_type,
+      discount_value: totals.discount_value,
       discount_total: totals.discount_total,
+      taxable_total: totals.taxable_total,
+      other_charges: totals.other_charges,
+      freight_amount: totals.freight_amount,
+      packing_amount: totals.packing_amount,
       tax_total: totals.tax_total,
       grand_total: totals.grand_total,
+      round_off: totals.round_off,
       created_by: userId,
       updated_by: userId
     },
     items: _.map(quotationItems, function (item, index) {
+      calculateLineAmounts(item);
       return {
         line_no: index + 1,
         material_id: item.material_id,
+        material_code: item.material_code,
         item_name: item.item_name,
+        material_type: item.material_type,
+        hsn_sac_code: item.hsn_sac_code,
         item_description: item.item_description,
         qty: cleanDecimal(item.qty, 0),
         unit: item.unit,
+        uom_id: cleanInt(item.uom_id, null),
         rate: cleanDecimal(item.rate, 0),
+        discount_type: item.discount_type,
+        discount_value: cleanDecimal(item.discount_value, 0),
+        discount_amount: cleanDecimal(item.discount_amount, 0),
+        gross_amount: cleanDecimal(item.gross_amount, 0),
+        taxable_amount: cleanDecimal(item.taxable_amount, 0),
         discount_percent: cleanDecimal(item.discount_percent, 0),
         tax_percent: cleanDecimal(item.tax_percent, 0),
-        line_total: calculateLineTotal(item)
+        tax_id: cleanInt(item.tax_id, null),
+        cgst_percent: cleanDecimal(item.cgst_percent, 0),
+        cgst_amount: cleanDecimal(item.cgst_amount, 0),
+        sgst_percent: cleanDecimal(item.sgst_percent, 0),
+        sgst_amount: cleanDecimal(item.sgst_amount, 0),
+        igst_percent: cleanDecimal(item.igst_percent, 0),
+        igst_amount: cleanDecimal(item.igst_amount, 0),
+        warehouse_id: cleanInt(item.warehouse_id, null),
+        delivery_date: item.delivery_date || null,
+        item_status: item.item_status || "Open",
+        line_total: cleanDecimal(item.line_total, 0)
       };
     })
   };
@@ -489,46 +709,85 @@ function loadQuotationDetails(quotationId) {
       renderCustomerOptions(header.customer_id || "");
       $("#customer_id").val(header.customer_id || "");
       $("#customer_contact").val(header.customer_contact || "");
+      $("#billing_address").val(header.billing_address || "");
+      $("#shipping_address").val(header.shipping_address || "");
       $("#valid_till").val(formatDate(header.valid_till));
       $("#reference_no").val(header.reference_no || "");
       $("#subject").val(header.subject || "");
+      $("#payment_term_id").val(header.payment_term_id || "");
+      $("#salesperson_id").val(header.salesperson_id || "");
+      $("#warehouse_id").val(header.warehouse_id || "");
+      $("#exchange_rate").val(header.exchange_rate || 1);
       if (header.currency && !_.find(currencies, function (item) {
         return String(item.currency_code || item.currency_name || "") === String(header.currency);
       })) {
         currencies.push({
+          currency_id: header.currency_id || header.currency,
           currency_code: header.currency,
           currency_name: header.currency
         });
       }
-      renderCurrencyOptions(header.currency || "");
-      $("#currency").val(header.currency || "");
+      var currencyId = header.currency_id || (findCurrencyByCode(header.currency || "") || {}).currency_id || "";
+      renderCurrencyOptions(currencyId, header.currency || "");
+      $("#currency_id").val(currencyId);
+      $("#currency").val(header.currency || $("#currency").val());
       $("#status").val(header.status || "Draft");
+      $("#revision_no").val(header.revision_no || 0);
+      $("#approval_status").val(header.approval_status || "Pending");
+      $("#reason").val(header.reason || "");
+      $("#discount_type").val(header.discount_type || "");
+      $("#discount_value").val(header.discount_value || 0);
+      $("#other_charges").val(header.other_charges || 0);
+      $("#freight_amount").val(header.freight_amount || 0);
+      $("#packing_amount").val(header.packing_amount || 0);
+      $("#round_off").val(header.round_off || 0);
       $("#notes").val(header.notes || "");
       $("#terms_conditions").val(header.terms_conditions || "");
 
       quotationItems = _.map(items, function (item, index) {
         var material = findMaterialByName(item.item_name);
-        var materialId = material ? material.material_id : null;
+        var materialId = item.material_id || (material ? material.material_id : null);
+        var uomId = item.uom_id || (findUomByValue(item.unit) || {}).uom_id || null;
         return {
           line_no: item.line_no || (index + 1),
           material_id: materialId,
+          material_code: item.material_code || (material ? (material.material_code || "") : ""),
           item_name: item.item_name || "",
-          part_code: material ? (material.material_code || "") : "",
-          hsn_sac_code: material ? (material.hsn_sac_code || "") : "",
+          material_type: item.material_type || (material ? (material.material_type || "") : ""),
+          hsn_sac_code: item.hsn_sac_code || (material ? (material.hsn_sac_code || "") : ""),
           item_description: item.item_description || "",
           qty: item.qty || 1,
           unit: item.unit || "",
+          uom_id: uomId,
           rate: item.rate || 0,
+          discount_type: item.discount_type || (cleanDecimal(item.discount_percent, 0) > 0 ? "PERCENT" : ""),
+          discount_value: item.discount_value || item.discount_percent || 0,
+          discount_amount: item.discount_amount || 0,
+          gross_amount: item.gross_amount || 0,
+          taxable_amount: item.taxable_amount || 0,
           discount_percent: item.discount_percent || 0,
           tax_percent: item.tax_percent || 0,
+          tax_id: item.tax_id || (material ? material.tax_id : null),
+          cgst_percent: item.cgst_percent || 0,
+          cgst_amount: item.cgst_amount || 0,
+          sgst_percent: item.sgst_percent || 0,
+          sgst_amount: item.sgst_amount || 0,
+          igst_percent: item.igst_percent || 0,
+          igst_amount: item.igst_amount || 0,
+          warehouse_id: item.warehouse_id || header.warehouse_id || "",
+          delivery_date: formatDate(item.delivery_date),
+          item_status: item.item_status || "Open",
           line_total: item.line_total || 0,
           is_active: item.is_active || "Y"
         };
       });
 
-      var savedDiscountTotal = cleanDecimal(header.discount_total, 0);
-      var quoteDiscount = savedDiscountTotal - calculateLineDiscountTotal(quotationItems);
-      $("#quote_discount_amount").val(roundMoney(Math.max(quoteDiscount, 0)));
+      if (!header.discount_type && cleanDecimal(header.discount_total, 0) > 0) {
+        var savedDiscountTotal = cleanDecimal(header.discount_total, 0);
+        var quoteDiscount = savedDiscountTotal - calculateLineDiscountTotal(quotationItems);
+        $("#discount_type").val(quoteDiscount > 0 ? "AMOUNT" : "");
+        $("#discount_value").val(roundMoney(Math.max(quoteDiscount, 0)));
+      }
 
       if (!quotationItems.length) {
         addQuotationItem();

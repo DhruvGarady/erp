@@ -195,6 +195,31 @@ html, body {
     background: #3a3f44; 
      transition: background 0.2s;
 } 
+
+#menuContainer tr.active-menu-row {
+	background: #1a73e8;
+}
+
+#menuContainer tr.active-menu-row:hover {
+	background: #1a73e8;
+}
+
+#menuContainer tr.active-menu-row td {
+	color: #fff;
+	font-weight: 700;
+}
+
+#menuContainer tr.active-menu-row td:first-child {
+	border-left: 4px solid #fff;
+}
+
+#menuContainer tr.active-parent-menu-row {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+#menuContainer tr.active-parent-menu-row td {
+	color: #fff;
+}
 /* Custom scrollbar for Chrome, Safari & Edge */
 
 #menuContainer::-webkit-scrollbar {

@@ -540,3 +540,154 @@ CREATE TABLE sales_order_items (
     updated_at DATETIME,
     is_active VARCHAR(20)
 );
+
+
+
+CREATE TABLE stock_ledger (
+    ledger_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    material_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    txn_type VARCHAR(50),
+    direction VARCHAR(10) NOT NULL,
+    qty DECIMAL(12,2) NOT NULL,
+    uom_id INT,
+    reference_type VARCHAR(50),
+    reference_id INT,
+    reference_no VARCHAR(50),
+    line_id INT,
+    txn_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    rate DECIMAL(12,2),
+    amount DECIMAL(12,2),
+    remarks TEXT,
+    created_by INT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+CREATE TABLE stock_reservation (
+    reservation_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sales_order_id INT NOT NULL,
+    sales_order_item_id INT NOT NULL,
+    material_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    reserved_qty DECIMAL(12,2) NOT NULL,
+    issued_qty DECIMAL(12,2),
+    balance_qty DECIMAL(12,2),
+    reservation_date DATETIME,
+    required_date DATE,
+    status VARCHAR(50),
+    remarks TEXT,
+    created_by INT,
+    updated_by INT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+CREATE TABLE deliveries (
+    delivery_id INT AUTO_INCREMENT PRIMARY KEY,
+    delivery_no VARCHAR(30) NOT NULL,
+    delivery_date DATE NOT NULL,
+    sales_order_id INT,
+    sales_order_no VARCHAR(30),
+    customer_id INT,
+    customer_name VARCHAR(150),
+    warehouse_id INT NOT NULL,
+    delivery_address VARCHAR(255),
+    status VARCHAR(50),
+    remarks TEXT,
+    created_by INT,
+    updated_by INT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+
+CREATE TABLE delivery_items (
+    delivery_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    delivery_id INT NOT NULL,
+    sales_order_item_id INT,
+    material_id INT NOT NULL,
+    material_code VARCHAR(50),
+    item_name VARCHAR(255),
+    uom_id INT,
+    delivery_qty DECIMAL(12,2) NOT NULL,
+    rate DECIMAL(12,2),
+    line_amount DECIMAL(12,2),
+    remarks TEXT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+
+CREATE TABLE goods_receipts (
+    goods_receipt_id INT AUTO_INCREMENT PRIMARY KEY,
+    goods_receipt_no VARCHAR(30) NOT NULL,
+    goods_receipt_date DATE NOT NULL,
+    reference_type VARCHAR(50),
+    reference_id INT,
+    reference_no VARCHAR(50),
+    vendor_id INT,
+    vendor_name VARCHAR(150),
+    warehouse_id INT NOT NULL,
+    remarks TEXT,
+    status VARCHAR(50),
+    created_by INT,
+    updated_by INT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+
+CREATE TABLE goods_receipt_items (
+    goods_receipt_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    goods_receipt_id INT NOT NULL,
+    material_id INT NOT NULL,
+    material_code VARCHAR(50),
+    item_name VARCHAR(255),
+    uom_id INT,
+    received_qty DECIMAL(12,2) NOT NULL,
+    rate DECIMAL(12,2),
+    line_amount DECIMAL(12,2),
+    remarks TEXT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+
+
+CREATE TABLE stock_transfers (
+    stock_transfer_id INT AUTO_INCREMENT PRIMARY KEY,
+    transfer_no VARCHAR(30) NOT NULL,
+    transfer_date DATE NOT NULL,
+    from_warehouse_id INT NOT NULL,
+    to_warehouse_id INT NOT NULL,
+    status VARCHAR(50),
+    remarks TEXT,
+    created_by INT,
+    updated_by INT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+CREATE TABLE stock_transfer_items (
+    stock_transfer_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    stock_transfer_id INT NOT NULL,
+    material_id INT NOT NULL,
+    material_code VARCHAR(50),
+    item_name VARCHAR(255),
+    uom_id INT,
+    transfer_qty DECIMAL(12,2) NOT NULL,
+    rate DECIMAL(12,2),
+    line_amount DECIMAL(12,2),
+    remarks TEXT,
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);

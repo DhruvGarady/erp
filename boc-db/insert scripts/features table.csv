@@ -1,0 +1,19 @@
+id,created_by,created_at,updated_by,updated_at,feature_name,feature_description,feature_url,display_sequence,parent_feature_id,icon,is_active
+TR100,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",DASHBOARD,DASHBOARD,/boc_repo/pages/home.html,1,,school,Y
+TR101,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",SALES,SALES,,2,,manage_accounts,Y
+TR102,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",QUOTATION,QUOTATION,/boc_repo/pages/sales/quotationinq.html,1,TR101,,Y
+TR103,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00","SALES ORDER","SALES ORDER",/boc_repo/pages/sales/salesorderinq.html,2,TR101,,N
+TR107,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00","COMMUNICATION AND NOTIFICATION","COMMUNICATION AND NOTIFICATION",,6,,notifications,N
+TR108,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",DISCUSSION,DISCUSSION,discussioninq.html,1,TR107,,N
+TR109,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00","ALERTS (Add/Del)",ALERTS,email_alertsinq.html,2,TR107,,Y
+TR110,Admin,"2025-02-13 00:00:00",Admin,"2026-04-27 22:46:02","MASTER DATA","MASTER DATA",/boc_repo/pages/masterdata/masterdata_dashboard.html,9,,create_new_folder,Y
+TR113,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",CUSTOMER,CUSTOMER,/boc_repo/pages/masterdata/customerinq.html,1,TR110,,Y
+TR114,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",VENDOR,VENDOR,/boc_repo/pages/masterdata/vendorinq.html,2,TR110,,Y
+TR115,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",WAREHOUSE,WAREHOUSE,/boc_repo/pages/masterdata/warehouseinq.html,3,TR110,,Y
+TR116,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00","MATERIAL CATEGORY","MATERIAL CATEGORY",/boc_repo/pages/masterdata/material_category_inq.html,4,TR110,,Y
+TR117,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00","MATERIAL MASTER","MATERIAL MASTER",/boc_repo/pages/masterdata/material_master_inq.html,5,TR110,,Y
+TR118,Admin,"2025-02-13 00:00:00",Admin,"2026-05-02 19:39:26","BILL OF MATERIAL","BILL OF MATERIAL",/boc_repo/pages/masterdata/bominq.html,6,TR110,,Y
+TR119,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",TAX,TAX,/boc_repo/pages/masterdata/taxinq.html,7,TR110,,Y
+TR120,Admin,"2025-02-13 00:00:00",Admin,"2026-04-27 23:39:32","UNIT OF MEASURE","UNIT OF MEASURE",/boc_repo/pages/masterdata/uominq.html,8,TR110,,Y
+TR121,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00",CURRENCY,CURRENCY,/boc_repo/pages/masterdata/currencyinq.html,9,TR110,,Y
+TR122,Admin,"2025-02-13 00:00:00",Admin,"2025-02-13 00:00:00","PAYMENT TERMS","PAYMENT TERMS",/boc_repo/pages/masterdata/payment_terms_inq.html,10,TR110,,Y

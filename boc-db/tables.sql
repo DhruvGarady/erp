@@ -691,3 +691,26 @@ CREATE TABLE stock_transfer_items (
     updated_at DATETIME,
     is_active VARCHAR(20)
 );
+
+
+CREATE TABLE inventory_summary (
+    inventory_summary_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    material_id INT NOT NULL,
+    warehouse_id INT NOT NULL,
+    available_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
+    reserved_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
+    on_hand_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
+    in_transit_qty DECIMAL(12,2) NOT NULL DEFAULT 0,
+    uom_id INT,
+    last_in_qty DECIMAL(12,2),
+    last_out_qty DECIMAL(12,2),
+    last_txn_date DATETIME,
+    last_txn_type VARCHAR(50),
+    min_stock DECIMAL(12,2),
+    max_stock DECIMAL(12,2),
+    reorder_level DECIMAL(12,2),
+    status VARCHAR(50),
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);

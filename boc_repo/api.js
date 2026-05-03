@@ -1550,6 +1550,277 @@ function insertSalesOrderItems(connection, salesOrderId, items, dateNow, callbac
     connection.query(itemSql, [itemValues], callback);
 }
 
+function cleanStockNumber(value) {
+    const parsed = Number(value || 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isSalesOrderReservableStatus(status) {
+    const normalized = String(status || "Open").toUpperCase();
+    return !["CANCELLED", "CANCELED", "CLOSED"].includes(normalized);
+}
+
+function buildSalesOrderReservationRows(salesOrderId, headerRow, items, itemInsertResult, dateNow) {
+    if (!items || items.length === 0 || !isSalesOrderReservableStatus(headerRow.status)) {
+        return [];
+    }
+
+    const firstItemId = itemInsertResult && itemInsertResult.insertId ? Number(itemInsertResult.insertId) : null;
+
+    if (!firstItemId) {
+        throw new Error("Unable to identify inserted sales order item ids for reservation");
+    }
+
+    return items
+        .map((item, index) => {
+            const itemStatus = String(item.item_status || "Open").toUpperCase();
+            const materialId = item.material_id ? Number(item.material_id) : null;
+            const warehouseId = item.warehouse_id ? Number(item.warehouse_id) : (headerRow.warehouse_id ? Number(headerRow.warehouse_id) : null);
+            const qty = cleanStockNumber(item.qty);
+            const deliveredQty = cleanStockNumber(item.delivered_qty);
+            const reserveQty = Math.max(qty - deliveredQty, 0);
+            const isClosedItem = ["CANCELLED", "CANCELED", "CLOSED"].includes(itemStatus);
+
+            if (materialId && reserveQty > 0 && !warehouseId && !isClosedItem) {
+                const warehouseErr = new Error(`Warehouse is required to reserve stock for material ${materialId}`);
+                warehouseErr.statusCode = 400;
+                throw warehouseErr;
+            }
+
+            if (!materialId || !warehouseId || reserveQty <= 0 || isClosedItem) {
+                return null;
+            }
+
+            return {
+                sales_order_id: salesOrderId,
+                sales_order_item_id: firstItemId + index,
+                material_id: materialId,
+                warehouse_id: warehouseId,
+                reserved_qty: reserveQty,
+                issued_qty: 0,
+                balance_qty: reserveQty,
+                reservation_date: dateNow,
+                required_date: item.delivery_date || headerRow.delivery_date || null,
+                status: "Reserved",
+                remarks: `Reserved for sales order ${headerRow.sales_order_no || salesOrderId}`,
+                created_by: headerRow.created_by || headerRow.updated_by || null,
+                updated_by: headerRow.updated_by || headerRow.created_by || null,
+                created_at: dateNow,
+                updated_at: dateNow,
+                is_active: "Y"
+            };
+        })
+        .filter(Boolean);
+}
+
+function groupReservationRequirements(reservationRows) {
+    const grouped = {};
+
+    reservationRows.forEach((row) => {
+        const key = `${row.material_id}_${row.warehouse_id}`;
+        if (!grouped[key]) {
+            grouped[key] = {
+                material_id: row.material_id,
+                warehouse_id: row.warehouse_id,
+                required_qty: 0
+            };
+        }
+        grouped[key].required_qty += cleanStockNumber(row.reserved_qty);
+    });
+
+    return Object.values(grouped);
+}
+
+function applyInventorySummaryReservations(connection, reservationRows, dateNow, callback) {
+    const groups = groupReservationRequirements(reservationRows);
+    let index = 0;
+
+    function applyNext() {
+        if (index >= groups.length) {
+            return callback();
+        }
+
+        const group = groups[index++];
+        const selectSql = `
+            SELECT inventory_summary_id, available_qty, reserved_qty, on_hand_qty
+            FROM inventory_summary
+            WHERE material_id = ?
+              AND warehouse_id = ?
+              AND is_active = 'Y'
+            LIMIT 1
+            FOR UPDATE
+        `;
+
+        connection.query(selectSql, [group.material_id, group.warehouse_id], (err, rows) => {
+            if (err) {
+                return callback(err);
+            }
+
+            if (!rows || !rows.length) {
+                const insertSummarySql = `
+                    INSERT INTO inventory_summary (
+                        material_id,
+                        warehouse_id,
+                        available_qty,
+                        reserved_qty,
+                        on_hand_qty,
+                        in_transit_qty,
+                        status,
+                        created_at,
+                        updated_at,
+                        is_active
+                    )
+                    VALUES (?, ?, 0, 0, 0, 0, 'Active', ?, ?, 'Y')
+                `;
+
+                return connection.query(insertSummarySql, [group.material_id, group.warehouse_id, dateNow, dateNow], (insertErr) => {
+                    if (insertErr) {
+                        return callback(insertErr);
+                    }
+
+                    const stockErr = new Error(`Insufficient stock for material ${group.material_id} in warehouse ${group.warehouse_id}. Available: 0, Required: ${group.required_qty}`);
+                    stockErr.statusCode = 400;
+                    return callback(stockErr);
+                });
+            }
+
+            const summary = rows[0];
+            const availableQty = cleanStockNumber(summary.available_qty);
+
+            if (availableQty < group.required_qty) {
+                const stockErr = new Error(`Insufficient stock for material ${group.material_id} in warehouse ${group.warehouse_id}. Available: ${availableQty}, Required: ${group.required_qty}`);
+                stockErr.statusCode = 400;
+                return callback(stockErr);
+            }
+
+            const updateSql = `
+                UPDATE inventory_summary
+                SET reserved_qty = reserved_qty + ?,
+                    available_qty = available_qty - ?,
+                    updated_at = ?
+                WHERE inventory_summary_id = ?
+            `;
+
+            connection.query(updateSql, [group.required_qty, group.required_qty, dateNow, summary.inventory_summary_id], (updateErr) => {
+                if (updateErr) {
+                    return callback(updateErr);
+                }
+
+                applyNext();
+            });
+        });
+    }
+
+    applyNext();
+}
+
+function insertSalesOrderReservations(connection, reservationRows, callback) {
+    if (!reservationRows || reservationRows.length === 0) {
+        return callback();
+    }
+
+    const reservationColumns = STOCK_RESERVATION_COLUMNS.filter(col => col !== "reservation_id");
+    const reservationValues = reservationRows.map(row => reservationColumns.map(col => row[col]));
+    const sql = `INSERT INTO stock_reservation (${reservationColumns.join(", ")}) VALUES ?`;
+
+    connection.query(sql, [reservationValues], callback);
+}
+
+function reserveSalesOrderStock(connection, salesOrderId, headerRow, items, itemInsertResult, dateNow, callback) {
+    let reservationRows;
+
+    try {
+        reservationRows = buildSalesOrderReservationRows(salesOrderId, headerRow, items, itemInsertResult, dateNow);
+    } catch (err) {
+        return callback(err);
+    }
+
+    if (!reservationRows.length) {
+        return callback();
+    }
+
+    applyInventorySummaryReservations(connection, reservationRows, dateNow, (summaryErr) => {
+        if (summaryErr) {
+            return callback(summaryErr);
+        }
+
+        insertSalesOrderReservations(connection, reservationRows, callback);
+    });
+}
+
+function releaseSalesOrderReservations(connection, salesOrderId, dateNow, updatedBy, callback) {
+    const selectSql = `
+        SELECT reservation_id, material_id, warehouse_id, balance_qty
+        FROM stock_reservation
+        WHERE sales_order_id = ?
+          AND is_active = 'Y'
+          AND UPPER(COALESCE(status, 'Reserved')) NOT IN ('RELEASED', 'CANCELLED', 'CANCELED', 'CLOSED')
+        FOR UPDATE
+    `;
+
+    connection.query(selectSql, [salesOrderId], (selectErr, reservations) => {
+        if (selectErr) {
+            return callback(selectErr);
+        }
+
+        const activeReservations = reservations || [];
+        const groups = groupReservationRequirements(activeReservations.map(row => ({
+            material_id: row.material_id,
+            warehouse_id: row.warehouse_id,
+            reserved_qty: cleanStockNumber(row.balance_qty)
+        })));
+
+        let index = 0;
+
+        function releaseNextSummary() {
+            if (index >= groups.length) {
+                const updateReservationSql = `
+                    UPDATE stock_reservation
+                    SET status = 'Released',
+                        balance_qty = 0,
+                        is_active = 'N',
+                        updated_by = ?,
+                        updated_at = ?
+                    WHERE sales_order_id = ?
+                      AND is_active = 'Y'
+                      AND UPPER(COALESCE(status, 'Reserved')) NOT IN ('RELEASED', 'CANCELLED', 'CANCELED', 'CLOSED')
+                `;
+
+                return connection.query(updateReservationSql, [updatedBy || null, dateNow, salesOrderId], callback);
+            }
+
+            const group = groups[index++];
+            const updateSummarySql = `
+                UPDATE inventory_summary
+                SET reserved_qty = GREATEST(reserved_qty - ?, 0),
+                    available_qty = available_qty + ?,
+                    updated_at = ?
+                WHERE material_id = ?
+                  AND warehouse_id = ?
+                  AND is_active = 'Y'
+            `;
+
+            connection.query(updateSummarySql, [group.required_qty, group.required_qty, dateNow, group.material_id, group.warehouse_id], (summaryErr) => {
+                if (summaryErr) {
+                    return callback(summaryErr);
+                }
+
+                releaseNextSummary();
+            });
+        }
+
+        releaseNextSummary();
+    });
+}
+
+function handleSalesOrderReservationError(connection, err, fallbackMessage, res) {
+    return connection.rollback(() => {
+        connection.release();
+        console.error(fallbackMessage, err);
+        res.status(err && err.statusCode ? err.statusCode : 500).json({ error: err && err.message ? err.message : fallbackMessage });
+    });
+}
+
 // ==================================================================
 // GET /salesorder/list
 // ==================================================================
@@ -1677,7 +1948,7 @@ app.post("/salesorder/create", verifyToken, (req, res) => {
 
                 const salesOrderId = headerResult.insertId;
 
-                insertSalesOrderItems(connection, salesOrderId, items, dateNow, (itemErr) => {
+                insertSalesOrderItems(connection, salesOrderId, items, dateNow, (itemErr, itemResult) => {
                     if (itemErr) {
                         return connection.rollback(() => {
                             connection.release();
@@ -1686,10 +1957,16 @@ app.post("/salesorder/create", verifyToken, (req, res) => {
                         });
                     }
 
-                    connection.commit((commitErr) => {
-                        connection.release();
-                        if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                        res.json({ success: true, sales_order_id: salesOrderId });
+                    reserveSalesOrderStock(connection, salesOrderId, headerRow, items, itemResult, dateNow, (reservationErr) => {
+                        if (reservationErr) {
+                            return handleSalesOrderReservationError(connection, reservationErr, "Reserve sales order stock error:", res);
+                        }
+
+                        connection.commit((commitErr) => {
+                            connection.release();
+                            if (commitErr) return res.status(500).json({ error: "Commit failed" });
+                            res.json({ success: true, sales_order_id: salesOrderId });
+                        });
                     });
                 });
             });
@@ -1729,29 +2006,45 @@ app.put("/salesorder/update/:id", verifyToken, (req, res) => {
                     });
                 }
 
-                const softDeleteSql = `UPDATE sales_order_items SET is_active = 'N', updated_at = ? WHERE sales_order_id = ?`;
-                connection.query(softDeleteSql, [dateNow, salesOrderId], (delErr) => {
-                    if (delErr) {
+                releaseSalesOrderReservations(connection, salesOrderId, dateNow, headerRow.updated_by, (reservationReleaseErr) => {
+                    if (reservationReleaseErr) {
                         return connection.rollback(() => {
                             connection.release();
-                            console.error("Soft delete sales order items error:", delErr);
-                            res.status(500).json({ error: "Failed to clear old sales order items" });
+                            console.error("Release sales order reservations error:", reservationReleaseErr);
+                            res.status(500).json({ error: "Failed to release old sales order reservations" });
                         });
                     }
 
-                    insertSalesOrderItems(connection, salesOrderId, items, dateNow, (itemErr) => {
-                        if (itemErr) {
+                    const softDeleteSql = `UPDATE sales_order_items SET is_active = 'N', updated_at = ? WHERE sales_order_id = ?`;
+                    connection.query(softDeleteSql, [dateNow, salesOrderId], (delErr) => {
+                        if (delErr) {
                             return connection.rollback(() => {
                                 connection.release();
-                                console.error("Insert updated sales order items error:", itemErr);
-                                res.status(500).json({ error: "Failed to insert updated sales order items" });
+                                console.error("Soft delete sales order items error:", delErr);
+                                res.status(500).json({ error: "Failed to clear old sales order items" });
                             });
                         }
 
-                        connection.commit((commitErr) => {
-                            connection.release();
-                            if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                            res.json({ success: true, sales_order_id: salesOrderId });
+                        insertSalesOrderItems(connection, salesOrderId, items, dateNow, (itemErr, itemResult) => {
+                            if (itemErr) {
+                                return connection.rollback(() => {
+                                    connection.release();
+                                    console.error("Insert updated sales order items error:", itemErr);
+                                    res.status(500).json({ error: "Failed to insert updated sales order items" });
+                                });
+                            }
+
+                            reserveSalesOrderStock(connection, salesOrderId, headerRow, items, itemResult, dateNow, (reservationErr) => {
+                                if (reservationErr) {
+                                    return handleSalesOrderReservationError(connection, reservationErr, "Reserve updated sales order stock error:", res);
+                                }
+
+                                connection.commit((commitErr) => {
+                                    connection.release();
+                                    if (commitErr) return res.status(500).json({ error: "Commit failed" });
+                                    res.json({ success: true, sales_order_id: salesOrderId });
+                                });
+                            });
                         });
                     });
                 });
@@ -1767,6 +2060,7 @@ app.patch("/salesorder/status/:id", verifyToken, (req, res) => {
     const salesOrderId = req.params.id;
     const dateNow = now();
     const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;
+    const nextStatus = String(req.body.status || "").toUpperCase();
 
     const sql = `
         UPDATE sales_orders
@@ -1776,6 +2070,54 @@ app.patch("/salesorder/status/:id", verifyToken, (req, res) => {
             updated_at = ?
         WHERE sales_order_id = ?
     `;
+
+    if (["CANCELLED", "CANCELED", "CLOSED"].includes(nextStatus)) {
+        pool.getConnection((connErr, connection) => {
+            if (connErr) {
+                return res.status(500).json({ error: "Database connection failed" });
+            }
+
+            connection.beginTransaction((txErr) => {
+                if (txErr) {
+                    connection.release();
+                    return res.status(500).json({ error: "Transaction start failed" });
+                }
+
+                connection.query(sql, [req.body.status || null, req.body.approval_status || null, updatedBy, dateNow, salesOrderId], (err, result) => {
+                    if (err) {
+                        return connection.rollback(() => {
+                            connection.release();
+                            console.error("PATCH /salesorder/status error:", err);
+                            res.status(500).json({ error: "Failed to update sales order status" });
+                        });
+                    }
+                    if (result.affectedRows === 0) {
+                        return connection.rollback(() => {
+                            connection.release();
+                            res.status(404).json({ error: "Sales order not found" });
+                        });
+                    }
+
+                    releaseSalesOrderReservations(connection, salesOrderId, dateNow, updatedBy, (releaseErr) => {
+                        if (releaseErr) {
+                            return connection.rollback(() => {
+                                connection.release();
+                                console.error("Release sales order reservations on status change error:", releaseErr);
+                                res.status(500).json({ error: "Failed to release sales order reservations" });
+                            });
+                        }
+
+                        connection.commit((commitErr) => {
+                            connection.release();
+                            if (commitErr) return res.status(500).json({ error: "Commit failed" });
+                            res.json({ success: true });
+                        });
+                    });
+                });
+            });
+        });
+        return;
+    }
 
     pool.query(sql, [req.body.status || null, req.body.approval_status || null, updatedBy, dateNow, salesOrderId], (err, result) => {
         if (err) {
@@ -1824,20 +2166,30 @@ app.delete("/salesorder/:id", verifyToken, (req, res) => {
                     });
                 }
 
-                const itemSql = `UPDATE sales_order_items SET is_active = 'N', updated_at = ? WHERE sales_order_id = ?`;
-                connection.query(itemSql, [dateNow, salesOrderId], (itemErr) => {
-                    if (itemErr) {
+                releaseSalesOrderReservations(connection, salesOrderId, dateNow, updatedBy, (releaseErr) => {
+                    if (releaseErr) {
                         return connection.rollback(() => {
                             connection.release();
-                            console.error("DELETE /salesorder/:id items error:", itemErr);
-                            res.status(500).json({ error: "Failed to delete sales order items" });
+                            console.error("DELETE /salesorder/:id reservation release error:", releaseErr);
+                            res.status(500).json({ error: "Failed to release sales order reservations" });
                         });
                     }
 
-                    connection.commit((commitErr) => {
-                        connection.release();
-                        if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                        res.json({ success: true });
+                    const itemSql = `UPDATE sales_order_items SET is_active = 'N', updated_at = ? WHERE sales_order_id = ?`;
+                    connection.query(itemSql, [dateNow, salesOrderId], (itemErr) => {
+                        if (itemErr) {
+                            return connection.rollback(() => {
+                                connection.release();
+                                console.error("DELETE /salesorder/:id items error:", itemErr);
+                                res.status(500).json({ error: "Failed to delete sales order items" });
+                            });
+                        }
+
+                        connection.commit((commitErr) => {
+                            connection.release();
+                            if (commitErr) return res.status(500).json({ error: "Commit failed" });
+                            res.json({ success: true });
+                        });
                     });
                 });
             });
@@ -2008,6 +2360,28 @@ const STOCK_RESERVATION_COLUMNS = [
     "is_active"
 ];
 
+const INVENTORY_SUMMARY_COLUMNS = [
+    "inventory_summary_id",
+    "material_id",
+    "warehouse_id",
+    "available_qty",
+    "reserved_qty",
+    "on_hand_qty",
+    "in_transit_qty",
+    "uom_id",
+    "last_in_qty",
+    "last_out_qty",
+    "last_txn_date",
+    "last_txn_type",
+    "min_stock",
+    "max_stock",
+    "reorder_level",
+    "status",
+    "created_at",
+    "updated_at",
+    "is_active"
+];
+
 const DELIVERY_HEADER_COLUMNS = [
     "delivery_id",
     "delivery_no",
@@ -2126,6 +2500,15 @@ registerSimpleTableRoutes({
     columns: STOCK_RESERVATION_COLUMNS,
     searchable: ["status", "remarks"],
     label: "stock reservation"
+});
+
+registerSimpleTableRoutes({
+    routeBase: "/inventorysummary",
+    tableName: "inventory_summary",
+    pk: "inventory_summary_id",
+    columns: INVENTORY_SUMMARY_COLUMNS,
+    searchable: ["status", "last_txn_type"],
+    label: "inventory summary"
 });
 
 registerSimpleTableRoutes({

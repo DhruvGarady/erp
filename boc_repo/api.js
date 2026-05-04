@@ -1581,12 +1581,6 @@ function buildSalesOrderReservationRows(salesOrderId, headerRow, items, itemInse
             const reserveQty = Math.max(qty - deliveredQty, 0);
             const isClosedItem = ["CANCELLED", "CANCELED", "CLOSED"].includes(itemStatus);
 
-            if (materialId && reserveQty > 0 && !warehouseId && !isClosedItem) {
-                const warehouseErr = new Error(`Warehouse is required to reserve stock for material ${materialId}`);
-                warehouseErr.statusCode = 400;
-                throw warehouseErr;
-            }
-
             if (!materialId || !warehouseId || reserveQty <= 0 || isClosedItem) {
                 return null;
             }
@@ -1656,57 +1650,79 @@ function applyInventorySummaryReservations(connection, reservationRows, dateNow,
                 return callback(err);
             }
 
-            if (!rows || !rows.length) {
-                const insertSummarySql = `
-                    INSERT INTO inventory_summary (
-                        material_id,
-                        warehouse_id,
-                        available_qty,
-                        reserved_qty,
-                        on_hand_qty,
-                        in_transit_qty,
-                        status,
-                        created_at,
-                        updated_at,
-                        is_active
-                    )
-                    VALUES (?, ?, 0, 0, 0, 0, 'Active', ?, ?, 'Y')
-                `;
+            const continueWithSummary = (summary) => {
+                let remainingAvailableQty = cleanStockNumber(summary.available_qty);
+                let allocatedQty = 0;
 
-                return connection.query(insertSummarySql, [group.material_id, group.warehouse_id, dateNow, dateNow], (insertErr) => {
-                    if (insertErr) {
-                        return callback(insertErr);
-                    }
+                reservationRows
+                    .filter(row => Number(row.material_id) === Number(group.material_id) && Number(row.warehouse_id) === Number(group.warehouse_id))
+                    .forEach((row) => {
+                        const requestedQty = cleanStockNumber(row.reserved_qty);
+                        const reserveQty = Math.min(requestedQty, Math.max(remainingAvailableQty, 0));
+                        const backorderQty = requestedQty - reserveQty;
 
-                    const stockErr = new Error(`Insufficient stock for material ${group.material_id} in warehouse ${group.warehouse_id}. Available: 0, Required: ${group.required_qty}`);
-                    stockErr.statusCode = 400;
-                    return callback(stockErr);
-                });
-            }
+                        row.requested_qty = requestedQty;
+                        row.reserved_qty = reserveQty;
+                        row.balance_qty = reserveQty;
+                        row.backorder_qty = backorderQty;
+                        row.status = backorderQty > 0 ? (reserveQty > 0 ? "Partially Reserved" : "Backorder") : "Reserved";
 
-            const summary = rows[0];
-            const availableQty = cleanStockNumber(summary.available_qty);
+                        allocatedQty += reserveQty;
+                        remainingAvailableQty -= reserveQty;
+                    });
 
-            if (availableQty < group.required_qty) {
-                const stockErr = new Error(`Insufficient stock for material ${group.material_id} in warehouse ${group.warehouse_id}. Available: ${availableQty}, Required: ${group.required_qty}`);
-                stockErr.statusCode = 400;
-                return callback(stockErr);
-            }
-
-            const updateSql = `
-                UPDATE inventory_summary
-                SET reserved_qty = reserved_qty + ?,
-                    available_qty = available_qty - ?,
-                    updated_at = ?
-                WHERE inventory_summary_id = ?
-            `;
-
-            connection.query(updateSql, [group.required_qty, group.required_qty, dateNow, summary.inventory_summary_id], (updateErr) => {
-                if (updateErr) {
-                    return callback(updateErr);
+                if (allocatedQty <= 0) {
+                    return applyNext();
                 }
 
-                applyNext();
+                const updateSql = `
+                    UPDATE inventory_summary
+                    SET reserved_qty = reserved_qty + ?,
+                        available_qty = available_qty - ?,
+                        updated_at = ?
+                    WHERE inventory_summary_id = ?
+                `;
+
+                connection.query(updateSql, [allocatedQty, allocatedQty, dateNow, summary.inventory_summary_id], (updateErr) => {
+                    if (updateErr) {
+                        return callback(updateErr);
+                    }
+
+                    applyNext();
+                });
+            };
+
+            if (rows && rows.length) {
+                return continueWithSummary(rows[0]);
+            }
+
+            const insertSummarySql = `
+                INSERT INTO inventory_summary (
+                    material_id,
+                    warehouse_id,
+                    available_qty,
+                    reserved_qty,
+                    on_hand_qty,
+                    in_transit_qty,
+                    status,
+                    created_at,
+                    updated_at,
+                    is_active
+                )
+                VALUES (?, ?, 0, 0, 0, 0, 'Active', ?, ?, 'Y')
+            `;
+
+            connection.query(insertSummarySql, [group.material_id, group.warehouse_id, dateNow, dateNow], (insertErr, insertResult) => {
+                if (insertErr) {
+                    return callback(insertErr);
+                }
+
+                continueWithSummary({
+                    inventory_summary_id: insertResult.insertId,
+                    available_qty: 0,
+                    reserved_qty: 0,
+                    on_hand_qty: 0
+                });
             });
         });
     }
@@ -1715,15 +1731,51 @@ function applyInventorySummaryReservations(connection, reservationRows, dateNow,
 }
 
 function insertSalesOrderReservations(connection, reservationRows, callback) {
-    if (!reservationRows || reservationRows.length === 0) {
+    const reservableRows = (reservationRows || []).filter(row => cleanStockNumber(row.reserved_qty) > 0);
+
+    if (reservableRows.length === 0) {
         return callback();
     }
 
     const reservationColumns = STOCK_RESERVATION_COLUMNS.filter(col => col !== "reservation_id");
-    const reservationValues = reservationRows.map(row => reservationColumns.map(col => row[col]));
+    const reservationValues = reservableRows.map(row => reservationColumns.map(col => row[col]));
     const sql = `INSERT INTO stock_reservation (${reservationColumns.join(", ")}) VALUES ?`;
 
     connection.query(sql, [reservationValues], callback);
+}
+
+function updateSalesOrderItemStockStatuses(connection, reservationRows, dateNow, callback) {
+    let index = 0;
+
+    function updateNext() {
+        if (index >= reservationRows.length) {
+            return callback();
+        }
+
+        const row = reservationRows[index++];
+        const updateSql = `UPDATE sales_order_items SET item_status = ?, updated_at = ? WHERE sales_order_item_id = ?`;
+
+        connection.query(updateSql, [row.status, dateNow, row.sales_order_item_id], (err) => {
+            if (err) {
+                return callback(err);
+            }
+
+            updateNext();
+        });
+    }
+
+    updateNext();
+}
+
+function updateSalesOrderBackorderStatus(connection, salesOrderId, reservationRows, dateNow, callback) {
+    const hasBackorder = (reservationRows || []).some(row => cleanStockNumber(row.backorder_qty) > 0);
+
+    if (!hasBackorder) {
+        return callback();
+    }
+
+    const sql = `UPDATE sales_orders SET status = 'Backorder', updated_at = ? WHERE sales_order_id = ?`;
+    connection.query(sql, [dateNow, salesOrderId], callback);
 }
 
 function reserveSalesOrderStock(connection, salesOrderId, headerRow, items, itemInsertResult, dateNow, callback) {
@@ -1744,7 +1796,19 @@ function reserveSalesOrderStock(connection, salesOrderId, headerRow, items, item
             return callback(summaryErr);
         }
 
-        insertSalesOrderReservations(connection, reservationRows, callback);
+        insertSalesOrderReservations(connection, reservationRows, (reservationErr) => {
+            if (reservationErr) {
+                return callback(reservationErr);
+            }
+
+            updateSalesOrderItemStockStatuses(connection, reservationRows, dateNow, (statusErr) => {
+                if (statusErr) {
+                    return callback(statusErr);
+                }
+
+                updateSalesOrderBackorderStatus(connection, salesOrderId, reservationRows, dateNow, callback);
+            });
+        });
     });
 }
 

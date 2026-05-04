@@ -451,7 +451,7 @@ label {
 
 .tempalte{
 	height:92%; 
-	width:99%;
+	width:100%;
 	border: 1px solid #ddd;
 	overflow-y:auto;
 }

@@ -584,7 +584,7 @@ function convertQuotationToSalesOrder(id) {
     return;
   }
 
-  showConfirmDialog("Convert this approved quotation to a sales order?", function () {
+  showConfirmDialog("Open this approved quotation in Sales Order creation?", function () {
     checkExistingSalesOrderForQuotation(id)
       .done(function (existingSalesOrder) {
         if (existingSalesOrder) {
@@ -592,12 +592,16 @@ function convertQuotationToSalesOrder(id) {
           return;
         }
 
-        createSalesOrderFromQuotation(id);
+        openSalesOrderDraftFromQuotation(id);
       })
       .fail(function (xhr) {
         handleActionError(xhr, "Unable to validate existing sales orders.");
       });
   });
+}
+
+function openSalesOrderDraftFromQuotation(quotationId) {
+  location.href = "salesorder_add.html?quotation_id=" + encodeURIComponent(quotationId);
 }
 
 function checkExistingSalesOrderForQuotation(quotationId) {

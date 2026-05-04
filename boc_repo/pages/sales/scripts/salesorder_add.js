@@ -1,4 +1,5 @@
 var editSalesOrderId;
+var sourceQuotationId;
 var customers = [];
 var currencies = [];
 var uoms = [];
@@ -6,6 +7,7 @@ var materials = [];
 var taxes = [];
 var paymentTerms = [];
 var warehouses = [];
+var inventorySummaries = [];
 var salesOrderItems = [];
 var salesOrderItemsTemplate;
 
@@ -18,6 +20,7 @@ $(document).ready(function () {
 
   var params = new URLSearchParams(window.location.search);
   editSalesOrderId = params.get("id");
+  sourceQuotationId = params.get("quotation_id") || params.get("quotationId");
 
   $("#salesOrderItemsContainer").on("change", ".lineMaterial", function () {
     onLineMaterialChange($(this).closest("tr"));
@@ -49,6 +52,9 @@ $(document).ready(function () {
       if (editSalesOrderId) {
         $("#pageTitle").text("Edit Sales Order Information:");
         loadSalesOrderDetails(editSalesOrderId);
+      } else if (sourceQuotationId) {
+        $("#pageTitle").text("Create Sales Order From Quotation:");
+        loadSalesOrderFromQuotation(sourceQuotationId);
       } else {
         $("#pageTitle").text("Add Sales Order Information:");
         $("#sales_order_date").val(todayString());
@@ -90,8 +96,9 @@ function loadLookups() {
     getMasterList("mst_material"),
     getMasterList("mst_tax"),
     getMasterList("mst_payment_terms"),
-    getMasterList("mst_warehouse")
-  ).done(function (customerRows, currencyRows, uomRows, materialRows, taxRows, paymentTermRows, warehouseRows) {
+    getMasterList("mst_warehouse"),
+    getInventorySummaryList()
+  ).done(function (customerRows, currencyRows, uomRows, materialRows, taxRows, paymentTermRows, warehouseRows, inventoryRows) {
     customers = customerRows || [];
     currencies = currencyRows || [];
     uoms = uomRows || [];
@@ -99,6 +106,18 @@ function loadLookups() {
     taxes = taxRows || [];
     paymentTerms = paymentTermRows || [];
     warehouses = warehouseRows || [];
+    inventorySummaries = inventoryRows || [];
+  });
+}
+
+function getInventorySummaryList() {
+  return $.ajax({
+    type: "GET",
+    url: request_url + "/inventorysummary/list",
+    headers: getAuthHeaders(),
+    contentType: "application/json"
+  }).then(function (res) {
+    return res || [];
   });
 }
 
@@ -140,6 +159,7 @@ function renderWarehouseOptions(selectedWarehouseId) {
     html += '<option value="' + warehouse.warehouse_id + '"' + selected + ">" + warehouseText + "</option>";
   });
   $("#warehouse_id").html(html);
+  $("#warehouse_id").prop("disabled", true);
 }
 
 function onCustomerChange() {
@@ -272,7 +292,7 @@ function addSalesOrderItem() {
     igst_amount: 0,
     tax_amount: 0,
     line_total: 0,
-    warehouse_id: cleanInt($("#warehouse_id").val(), null),
+    warehouse_id: null,
     delivery_date: $("#delivery_date").val() || "",
     item_status: "Open",
     is_active: "Y"
@@ -300,6 +320,7 @@ function onLineMaterialChange(row) {
 
   applyMaterialDefaults(salesOrderItems[index], material);
   renderSalesOrderItems();
+  showWarehouseStockDialog(index);
 }
 
 function applyMaterialDefaults(item, material) {
@@ -319,9 +340,320 @@ function applyMaterialDefaults(item, material) {
   item.igst_percent = 0;
   item.discount_type = material.discount_allowed === "Y" && cleanDecimal(material.default_discount_percent, 0) > 0 ? "PERCENT" : "";
   item.discount_value = item.discount_type === "PERCENT" ? cleanDecimal(material.default_discount_percent, 0) : 0;
-  item.warehouse_id = cleanInt(material.default_warehouse_id, cleanInt($("#warehouse_id").val(), null));
+  item.warehouse_id = null;
+  item.item_status = "Open";
   item.delivery_date = item.delivery_date || $("#delivery_date").val() || "";
   calculateLineAmounts(item);
+}
+
+function showWarehouseStockDialog(index) {
+  var item = salesOrderItems[index];
+
+  if (!item || !item.material_id) {
+    return;
+  }
+
+  getInventorySummaryList()
+    .done(function (rows) {
+      inventorySummaries = rows || [];
+      openWarehouseStockDialog(index);
+    })
+    .fail(function () {
+      inventorySummaries = inventorySummaries || [];
+      openWarehouseStockDialog(index);
+    });
+}
+
+function openLineWarehousePicker(index) {
+  syncSalesOrderItemRows();
+
+  if (!salesOrderItems[index] || !salesOrderItems[index].material_id) {
+    showWarningDialog("Please select a material before selecting warehouse stock.");
+    return;
+  }
+
+  showWarehouseStockDialog(index);
+}
+
+function openAllWarehousePicker() {
+  syncSalesOrderItemRows();
+
+  if (!salesOrderItems.length) {
+    showWarningDialog("Please add at least one sales order item.");
+    return;
+  }
+
+  var materialItems = _.filter(salesOrderItems, function (item) {
+    return item && item.material_id;
+  });
+
+  if (!materialItems.length) {
+    showWarningDialog("Please select material before applying warehouse to all items.");
+    return;
+  }
+
+  getInventorySummaryList()
+    .done(function (rows) {
+      inventorySummaries = rows || [];
+      openAllWarehouseDialog(materialItems.length);
+    })
+    .fail(function () {
+      inventorySummaries = inventorySummaries || [];
+      openAllWarehouseDialog(materialItems.length);
+    });
+}
+
+function openWarehouseStockDialog(index) {
+  var item = salesOrderItems[index];
+  var material = findMaterial(item.material_id);
+  var stockRows = buildWarehouseStockRows(item.material_id);
+
+  $("#warehouseStockDialog").remove();
+
+  var html = '<div id="warehouseStockDialog" title="Select Warehouse" style="display:none;">' +
+    '<div style="margin-bottom:10px;"><b>' + escapeHtml(item.material_code || "") + '</b> ' + escapeHtml(item.item_name || (material ? material.material_name : "")) + '</div>' +
+    '<div style="margin-bottom:10px;">Order Qty: <b>' + formatAmount(item.qty || 0) + '</b></div>';
+
+  if (!hasAvailableStock(stockRows)) {
+    html += '<div style="margin-bottom:10px;color:#a05a00;font-weight:600;">No available stock found. Select a warehouse to save this line as backorder.</div>';
+  }
+
+  html += '<div class="warehouse-stock-table-scroll"><table style="width:100%;" class="dataTbl">' +
+    '<tr>' +
+      '<th width="6%">Select</th>' +
+      '<th width="30%">Warehouse</th>' +
+      '<th width="16%">On Hand</th>' +
+      '<th width="16%">Reserved</th>' +
+      '<th width="16%">Available</th>' +
+      '<th width="16%">Line Status</th>' +
+    '</tr>';
+
+  _.each(stockRows, function (row) {
+    var projectedStatus = getProjectedItemStatus(item.qty, row.available_qty);
+    html += '<tr>' +
+      '<td style="text-align:center;"><input type="radio" name="stockWarehouse" value="' + row.warehouse_id + '" ' + (String(item.warehouse_id || "") === String(row.warehouse_id) ? "checked" : "") + '></td>' +
+      '<td>' + escapeHtml(row.warehouse_text) + '</td>' +
+      '<td style="text-align:right;">' + formatAmount(row.on_hand_qty) + '</td>' +
+      '<td style="text-align:right;">' + formatAmount(row.reserved_qty) + '</td>' +
+      '<td style="text-align:right;">' + formatAmount(row.available_qty) + '</td>' +
+      '<td>' + escapeHtml(projectedStatus) + '</td>' +
+    '</tr>';
+  });
+
+  html += '</table></div></div>';
+  $("body").append(html);
+
+  $("#warehouseStockDialog").dialog({
+    modal: true,
+    width: 760,
+    maxHeight: 560,
+    dialogClass: "warehouse-stock-dialog",
+    open: function () {
+      $(this).closest(".ui-dialog").find(".ui-dialog-titlebar-close").attr("title", "Close");
+      styleWarehouseDialogButtons($(this));
+    },
+    buttons: {
+      "Select": function () {
+        var selectedWarehouseId = $("input[name='stockWarehouse']:checked").val();
+
+        if (!selectedWarehouseId) {
+          showWarningDialog("Please select a warehouse for this item.");
+          return;
+        }
+
+        var selectedStock = _.find(stockRows, function (row) {
+          return String(row.warehouse_id) === String(selectedWarehouseId);
+        });
+
+        salesOrderItems[index].warehouse_id = cleanInt(selectedWarehouseId, null);
+        salesOrderItems[index].item_status = getProjectedItemStatus(salesOrderItems[index].qty, selectedStock ? selectedStock.available_qty : 0);
+        renderSalesOrderItems();
+        $(this).dialog("destroy").remove();
+      },
+      "Cancel": function () {
+        $(this).dialog("destroy").remove();
+      }
+    }
+  });
+}
+
+function openAllWarehouseDialog(materialLineCount) {
+  $("#warehouseAllDialog").remove();
+
+  var html = '<div id="warehouseAllDialog" title="Select Warehouse For All Items" style="display:none;">' +
+    '<div style="margin-bottom:10px;">Apply one warehouse to <b>' + materialLineCount + '</b> material line(s).</div>' +
+    '<div class="warehouse-stock-table-scroll"><table style="width:100%;" class="dataTbl">' +
+      '<tr>' +
+        '<th width="8%">Select</th>' +
+        '<th width="42%">Warehouse</th>' +
+        '<th width="25%">Available Lines</th>' +
+        '<th width="25%">Backorder / Partial</th>' +
+      '</tr>';
+
+  _.each(buildAllWarehouseRows(), function (row) {
+    html += '<tr>' +
+      '<td style="text-align:center;"><input type="radio" name="allStockWarehouse" value="' + row.warehouse_id + '"></td>' +
+      '<td>' + escapeHtml(row.warehouse_text) + '</td>' +
+      '<td style="text-align:right;">' + row.available_lines + '</td>' +
+      '<td style="text-align:right;">' + row.backorder_lines + '</td>' +
+    '</tr>';
+  });
+
+  html += '</table></div></div>';
+  $("body").append(html);
+
+  $("#warehouseAllDialog").dialog({
+    modal: true,
+    width: 700,
+    maxHeight: 520,
+    dialogClass: "warehouse-stock-dialog",
+    open: function () {
+      $(this).closest(".ui-dialog").find(".ui-dialog-titlebar-close").attr("title", "Close");
+      styleWarehouseDialogButtons($(this));
+    },
+    buttons: {
+      "Select": function () {
+        var selectedWarehouseId = $("input[name='allStockWarehouse']:checked").val();
+
+        if (!selectedWarehouseId) {
+          showWarningDialog("Please select a warehouse.");
+          return;
+        }
+
+        applyWarehouseToAllItems(selectedWarehouseId);
+        $(this).dialog("destroy").remove();
+      },
+      "Cancel": function () {
+        $(this).dialog("destroy").remove();
+      }
+    }
+  });
+}
+
+function buildAllWarehouseRows() {
+  return _.map(warehouses || [], function (warehouse) {
+    var availableLines = 0;
+    var backorderLines = 0;
+
+    _.each(salesOrderItems || [], function (item) {
+      if (!item || !item.material_id) {
+        return;
+      }
+
+      var summary = findInventorySummary(item.material_id, warehouse.warehouse_id);
+      var availableQty = cleanDecimal(summary ? summary.available_qty : 0, 0);
+      var projectedStatus = getProjectedItemStatus(item.qty, availableQty);
+
+      if (projectedStatus === "Open") {
+        availableLines += 1;
+      } else {
+        backorderLines += 1;
+      }
+    });
+
+    return {
+      warehouse_id: warehouse.warehouse_id,
+      warehouse_text: (warehouse.warehouse_code ? warehouse.warehouse_code + " - " : "") + (warehouse.warehouse_name || ""),
+      available_lines: availableLines,
+      backorder_lines: backorderLines
+    };
+  }).sort(function (a, b) {
+    return b.available_lines - a.available_lines;
+  });
+}
+
+function applyWarehouseToAllItems(warehouseId) {
+  _.each(salesOrderItems || [], function (item) {
+    if (!item || !item.material_id) {
+      return;
+    }
+
+    var summary = findInventorySummary(item.material_id, warehouseId);
+    item.warehouse_id = cleanInt(warehouseId, null);
+    item.item_status = getProjectedItemStatus(item.qty, summary ? summary.available_qty : 0);
+  });
+
+  renderSalesOrderItems();
+}
+
+function styleWarehouseDialogButtons(dialogContent) {
+  var buttons = dialogContent.closest(".ui-dialog").find(".ui-dialog-buttonpane button");
+
+  buttons.each(function () {
+    var button = $(this);
+    var label = $.trim(button.text());
+
+    button.removeClass("ui-button ui-corner-all ui-widget");
+    button.addClass("search");
+
+    if (label.toLowerCase() === "cancel") {
+      button.addClass("warehouse-dialog-cancel");
+    }
+  });
+}
+
+function buildWarehouseStockRows(materialId) {
+  return _.map(warehouses || [], function (warehouse) {
+    var summary = findInventorySummary(materialId, warehouse.warehouse_id);
+    var warehouseText = (warehouse.warehouse_code ? warehouse.warehouse_code + " - " : "") + (warehouse.warehouse_name || "");
+
+    return {
+      warehouse_id: warehouse.warehouse_id,
+      warehouse_text: warehouseText,
+      on_hand_qty: cleanDecimal(summary ? summary.on_hand_qty : 0, 0),
+      reserved_qty: cleanDecimal(summary ? summary.reserved_qty : 0, 0),
+      available_qty: cleanDecimal(summary ? summary.available_qty : 0, 0)
+    };
+  }).sort(function (a, b) {
+    return cleanDecimal(b.available_qty, 0) - cleanDecimal(a.available_qty, 0);
+  });
+}
+
+function getWarehouseDisplay(warehouseId, materialId) {
+  if (!materialId) {
+    return "Select Material";
+  }
+
+  if (!warehouseId) {
+    return "Select Warehouse";
+  }
+
+  var warehouse = _.find(warehouses || [], function (item) {
+    return String(item.warehouse_id) === String(warehouseId);
+  });
+
+  if (!warehouse) {
+    return "Select Warehouse";
+  }
+
+  return (warehouse.warehouse_code ? warehouse.warehouse_code + " - " : "") + (warehouse.warehouse_name || "");
+}
+
+function findInventorySummary(materialId, warehouseId) {
+  return _.find(inventorySummaries || [], function (summary) {
+    return String(summary.material_id) === String(materialId) && String(summary.warehouse_id) === String(warehouseId);
+  });
+}
+
+function hasAvailableStock(stockRows) {
+  return _.some(stockRows || [], function (row) {
+    return cleanDecimal(row.available_qty, 0) > 0;
+  });
+}
+
+function getProjectedItemStatus(qty, availableQty) {
+  var requiredQty = cleanDecimal(qty, 0);
+  var available = cleanDecimal(availableQty, 0);
+
+  if (available <= 0) {
+    return "Backorder";
+  }
+
+  if (available < requiredQty) {
+    return "Partially Reserved";
+  }
+
+  return "Open";
 }
 
 function deleteSalesOrderItem(index) {
@@ -375,7 +707,8 @@ function renderSalesOrderItems() {
     materials: materials || [],
     uoms: uoms || [],
     warehouses: warehouses || [],
-    formatAmount: formatAmount
+    formatAmount: formatAmount,
+    getWarehouseDisplay: getWarehouseDisplay
   }));
   $("#salesOrderItemsContainer").trigger("create");
 }
@@ -548,7 +881,7 @@ function buildPayload() {
       exchange_rate: cleanDecimal($("#exchange_rate").val(), 1),
       payment_term_id: cleanInt($("#payment_term_id").val(), null),
       salesperson_id: cleanInt($("#salesperson_id").val(), null),
-      warehouse_id: cleanInt($("#warehouse_id").val(), null),
+      warehouse_id: null,
       delivery_date: $("#delivery_date").val() || null,
       status: $("#status").val() || "Draft",
       approval_status: $("#approval_status").val() || "Pending",
@@ -684,6 +1017,166 @@ function saveSalesOrder() {
       $(".searchButton").prop("disabled", false);
     }
   });
+}
+
+function loadSalesOrderFromQuotation(quotationId) {
+  $.when(
+    $.ajax({
+      type: "GET",
+      url: request_url + "/quotation/" + quotationId,
+      headers: getAuthHeaders(),
+      contentType: "application/json"
+    }),
+    $.ajax({
+      type: "GET",
+      url: request_url + "/salesorder/nextno",
+      headers: getAuthHeaders(),
+      contentType: "application/json"
+    })
+  ).done(function (quotationResponse, nextNoResponse) {
+    var quotation = quotationResponse && quotationResponse[0] ? quotationResponse[0] : {};
+    var nextNo = nextNoResponse && nextNoResponse[0] ? nextNoResponse[0].sales_order_no : "";
+    var header = quotation.header || {};
+    var items = quotation.items || [];
+
+    if (!isQuotationApprovedForSalesOrder(header)) {
+      showWarningDialog("Only approved quotations can be converted to sales orders.");
+      return;
+    }
+
+    if (!items.length) {
+      showWarningDialog("This quotation has no items to convert.");
+      return;
+    }
+
+    populateSalesOrderFromQuotation(header, items, nextNo);
+  }).fail(function (xhr) {
+    handleSaveError(xhr, "Unable to load quotation details for sales order creation.");
+  });
+}
+
+function isQuotationApprovedForSalesOrder(header) {
+  var status = String(header && header.status ? header.status : "").toUpperCase();
+  var approvalStatus = String(header && header.approval_status ? header.approval_status : "").toUpperCase();
+  return status === "APPROVED" || approvalStatus === "APPROVED";
+}
+
+function populateSalesOrderFromQuotation(header, items, salesOrderNo) {
+  $("#sales_order_no").val(salesOrderNo || "");
+  $("#sales_order_date").val(todayString());
+  $("#quotation_id").val(header.quotation_id || "");
+  $("#quotation_no").val(header.quotation_no || "");
+  $("#delivery_date").val("");
+  $("#reference_no").val(header.reference_no || "");
+  $("#subject").val(header.subject || "");
+
+  if (header.customer_id && !findCustomer(header.customer_id)) {
+    customers.push({
+      customer_id: header.customer_id,
+      customer_name: header.customer_name || "",
+      contact_person: header.customer_contact || ""
+    });
+  }
+
+  renderCustomerOptions(header.customer_id || "");
+  $("#customer_id").val(header.customer_id || "");
+  $("#customer_contact").val(header.customer_contact || "");
+  $("#billing_address").val(header.billing_address || "");
+  $("#shipping_address").val(header.shipping_address || "");
+  $("#payment_term_id").val(header.payment_term_id || "");
+  $("#salesperson_id").val(header.salesperson_id || "");
+  $("#warehouse_id").val("");
+  $("#exchange_rate").val(header.exchange_rate || 1);
+
+  if (header.currency && !_.find(currencies, function (item) {
+    return String(item.currency_code || item.currency_name || "") === String(header.currency);
+  })) {
+    currencies.push({
+      currency_id: header.currency_id || header.currency,
+      currency_code: header.currency,
+      currency_name: header.currency
+    });
+  }
+
+  var currencyId = header.currency_id || (findCurrencyByCode(header.currency || "") || {}).currency_id || "";
+  renderCurrencyOptions(currencyId, header.currency || "");
+  $("#currency_id").val(currencyId);
+  $("#currency").val(header.currency || $("#currency").val());
+  $("#status").val("Open");
+  $("#approval_status").val("Pending");
+  $("#discount_type").val(header.discount_type || "");
+  $("#discount_value").val(header.discount_value || 0);
+  $("#freight_amount").val(header.freight_amount || 0);
+  $("#packing_amount").val(header.packing_amount || 0);
+  $("#other_charges").val(header.other_charges || 0);
+  $("#round_off").val(header.round_off || 0);
+  $("#notes").val(header.notes || "");
+  $("#terms_conditions").val(header.terms_conditions || "");
+
+  salesOrderItems = _.map(items, function (item, index) {
+    return buildSalesOrderItemFromQuotation(item, index);
+  });
+
+  if (!header.discount_type && cleanDecimal(header.discount_total, 0) > 0) {
+    var savedDiscountTotal = cleanDecimal(header.discount_total, 0);
+    var orderDiscount = savedDiscountTotal - calculateLineDiscountTotal(salesOrderItems);
+    $("#discount_type").val(orderDiscount > 0 ? "AMOUNT" : "");
+    $("#discount_value").val(roundMoney(Math.max(orderDiscount, 0)));
+  }
+
+  renderSalesOrderItems();
+}
+
+function buildSalesOrderItemFromQuotation(item, index) {
+  var material = item.material_id ? findMaterial(item.material_id) : findMaterialByName(item.item_name);
+  var materialId = item.material_id || (material ? material.material_id : null);
+  var uomId = item.uom_id || (findUomByValue(item.unit) || {}).uom_id || null;
+  var qty = cleanDecimal(item.qty, 1);
+  var rate = cleanDecimal(item.rate, 0);
+  var grossAmount = cleanDecimal(item.gross_amount, qty * rate);
+  var discountAmount = cleanDecimal(item.discount_amount, 0);
+  var taxableAmount = cleanDecimal(item.taxable_amount, grossAmount - discountAmount);
+  var cgstAmount = cleanDecimal(item.cgst_amount, 0);
+  var sgstAmount = cleanDecimal(item.sgst_amount, 0);
+  var igstAmount = cleanDecimal(item.igst_amount, 0);
+  var taxAmount = cleanDecimal(item.tax_amount, cgstAmount + sgstAmount + igstAmount);
+  var lineTotal = cleanDecimal(item.line_total, taxableAmount + taxAmount);
+
+  return {
+    quotation_item_id: item.quotation_item_id || null,
+    line_no: item.line_no || (index + 1),
+    material_id: materialId,
+    material_code: item.material_code || (material ? (material.material_code || "") : ""),
+    item_name: item.item_name || (material ? (material.material_name || "") : ""),
+    material_type: item.material_type || (material ? (material.material_type || "") : ""),
+    hsn_sac_code: item.hsn_sac_code || (material ? (material.hsn_sac_code || material.hsn_code || "") : ""),
+    item_description: item.item_description || (material ? (material.material_description || "") : ""),
+    qty: qty,
+    delivered_qty: 0,
+    invoiced_qty: 0,
+    unit: item.unit || getUomValue(uomId),
+    uom_id: uomId,
+    rate: rate,
+    gross_amount: roundMoney(grossAmount),
+    discount_type: item.discount_type || (cleanDecimal(item.discount_percent, 0) > 0 ? "PERCENT" : ""),
+    discount_value: cleanDecimal(item.discount_value, cleanDecimal(item.discount_percent, 0)),
+    discount_amount: roundMoney(discountAmount),
+    taxable_amount: roundMoney(taxableAmount),
+    tax_id: item.tax_id || (material ? material.tax_id : null),
+    tax_percent: cleanDecimal(item.tax_percent, 0),
+    cgst_percent: cleanDecimal(item.cgst_percent, 0),
+    cgst_amount: roundMoney(cgstAmount),
+    sgst_percent: cleanDecimal(item.sgst_percent, 0),
+    sgst_amount: roundMoney(sgstAmount),
+    igst_percent: cleanDecimal(item.igst_percent, 0),
+    igst_amount: roundMoney(igstAmount),
+    tax_amount: roundMoney(taxAmount),
+    line_total: roundMoney(lineTotal),
+    warehouse_id: null,
+    delivery_date: formatDate(item.delivery_date),
+    item_status: "Open",
+    is_active: "Y"
+  };
 }
 
 function loadSalesOrderDetails(salesOrderId) {
@@ -837,6 +1330,15 @@ function cleanDecimal(value, fallback) {
 
 function roundMoney(value) {
   return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function escapeHtml(value) {
+  return String(value === null || value === undefined ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function formatAmount(value) {

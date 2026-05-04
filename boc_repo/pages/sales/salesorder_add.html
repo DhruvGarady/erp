@@ -51,7 +51,7 @@
 
   .salesorder-items-template {
     height: 82%;
-    width: 99%;
+    width: 100%;
     border: 1px solid #ddd;
     overflow: auto;
   }
@@ -62,6 +62,119 @@
 
   .salesorder-items-section {
     height: 45vh;
+  }
+
+  .warehouse-picker-button {
+    align-items: center;
+    background: #eef4ff;
+    border: 1px solid #b9cdf1;
+    border-radius: 4px;
+    color: #1f3d68;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 600;
+    gap: 4px;
+    justify-content: center;
+    min-height: 28px;
+    padding: 4px 8px;
+    width: 100%;
+  }
+
+  .warehouse-picker-button .material-icons {
+    flex: 0 0 auto;
+    font-size: 16px;
+  }
+
+  .warehouse-picker-button span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .warehouse-picker-button:hover {
+    background: #e2ecff;
+  }
+
+  .warehouse-dialog-cancel {
+    background-color: #dc3545 !important;
+  }
+
+  .warehouse-all-button {
+    width: 130px !important;
+  }
+
+  .warehouse-stock-dialog.ui-dialog {
+    border: 1px solid #cfd6df;
+    border-radius: 4px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+    padding: 0;
+  }
+
+  .warehouse-stock-dialog .ui-dialog-titlebar {
+    background: #f7f9fc;
+    border: 0;
+    border-bottom: 1px solid #d8dee8;
+    color: #1f2937;
+    font-weight: 700;
+    padding: 12px 16px;
+  }
+
+  .warehouse-stock-dialog .ui-dialog-titlebar-close {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 4px;
+    color: #1f2937;
+    cursor: pointer;
+    font-size: 0;
+    height: 28px;
+    margin-top: -14px;
+    padding: 0 !important;
+    right: 10px;
+    text-indent: 0 !important;
+    top: 50%;
+    width: 28px;
+  }
+
+  .warehouse-stock-dialog .ui-dialog-titlebar-close .ui-icon,
+  .warehouse-stock-dialog .ui-dialog-titlebar-close .ui-button-icon,
+  .warehouse-stock-dialog .ui-dialog-titlebar-close .ui-button-icon-space,
+  .warehouse-stock-dialog .ui-dialog-titlebar-close .ui-button-text {
+    display: none !important;
+  }
+
+  .warehouse-stock-dialog .ui-dialog-titlebar-close::before {
+    content: "x";
+    display: block;
+    font-family: Arial, sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 28px;
+    text-align: center;
+  }
+
+  .warehouse-stock-dialog .ui-dialog-titlebar-close:hover {
+    background: #e7ecf3 !important;
+  }
+
+  .warehouse-stock-dialog .ui-dialog-content {
+    padding: 14px 18px;
+  }
+
+  .warehouse-stock-table-scroll {
+    border: 1px solid #d8dee8;
+    max-height: 260px;
+    overflow: auto;
+  }
+
+  .warehouse-stock-table-scroll .dataTbl {
+    margin-bottom: 0;
+  }
+
+  .warehouse-stock-table-scroll .dataTbl th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
 </style>
 
@@ -216,6 +329,7 @@
                     <select id="status" name="status">
                       <option value="Draft">Draft</option>
                       <option value="Open">Open</option>
+                      <option value="Backorder">Backorder</option>
                       <option value="Confirmed">Confirmed</option>
                       <option value="Partially Delivered">Partially Delivered</option>
                       <option value="Closed">Closed</option>
@@ -292,7 +406,7 @@
                 <td>
                   <div class="form-group">
                     Warehouse
-                    <select id="warehouse_id" name="warehouse_id"></select>
+                    <select id="warehouse_id" name="warehouse_id" disabled></select>
                   </div>
                 </td>
                 <td></td>
@@ -423,7 +537,10 @@
       <div class="sectionDiv salesorder-items-section">
         <table width="100%">
           <tr>
-            <td class="mainTblHdr">Sales Order Items:</td>
+            <td class="mainTblHdr" width="80%">Sales Order Items:</td>
+            <td style="text-align:right; width:150px;">
+              <input type="button" value="Warehouse All" onclick="openAllWarehousePicker()" class="search warehouse-all-button">
+            </td>
             <td style="text-align:right;">
               <input type="button" value="Add Row" onclick="addSalesOrderItem()" class="search">
             </td>
@@ -518,17 +635,19 @@
                   <td style="text-align:right;"><span class="lineIgstAmountLabel"><%= formatAmount(item.igst_amount || 0) %></span></td>
                   <td style="text-align:right;"><span class="lineTaxAmountLabel"><%= formatAmount(item.tax_amount || 0) %></span></td>
                   <td>
-                    <select class="salesorder-line-select lineWarehouse">
-                      <option value="">Select</option>
-                      <%_.each(warehouses, function(warehouse){ %>
-                        <option value="<%= warehouse.warehouse_id %>" <%= String(item.warehouse_id || '') === String(warehouse.warehouse_id) ? 'selected' : '' %>><%= warehouse.warehouse_code ? warehouse.warehouse_code + ' - ' : '' %><%= warehouse.warehouse_name || '' %></option>
-                      <% }); %>
-                    </select>
+                    <input type="hidden" class="lineWarehouse" value="<%= item.warehouse_id || '' %>">
+                    <button type="button" class="warehouse-picker-button" onclick="openLineWarehousePicker(<%= index %>)">
+                      <span class="material-icons">warehouse</span>
+                      <span><%= getWarehouseDisplay(item.warehouse_id, item.material_id) %></span>
+                    </button>
                   </td>
                   <td><input type="date" class="salesorder-line-input lineDeliveryDate" value="<%= item.delivery_date || '' %>"></td>
                   <td>
                     <select class="salesorder-line-select lineItemStatus">
                       <option value="Open" <%= (item.item_status || 'Open') === 'Open' ? 'selected' : '' %>>Open</option>
+                      <option value="Reserved" <%= item.item_status === 'Reserved' ? 'selected' : '' %>>Reserved</option>
+                      <option value="Partially Reserved" <%= item.item_status === 'Partially Reserved' ? 'selected' : '' %>>Partially Reserved</option>
+                      <option value="Backorder" <%= item.item_status === 'Backorder' ? 'selected' : '' %>>Backorder</option>
                       <option value="Hold" <%= item.item_status === 'Hold' ? 'selected' : '' %>>Hold</option>
                       <option value="Closed" <%= item.item_status === 'Closed' ? 'selected' : '' %>>Closed</option>
                       <option value="Cancelled" <%= item.item_status === 'Cancelled' ? 'selected' : '' %>>Cancelled</option>

@@ -152,7 +152,13 @@ function buildFeatureTree(features) {
 		});
 	});
 
-	return parentFeatureList;
+	var sortedData = _.sortBy(_.map(parentFeatureList, function(item) {
+		item.childFeatures = _.sortBy(item.childFeatures || [], 'display_sequence');
+		return item;
+	}), 'display_sequence');
+
+	//return parentFeatureList;
+	return sortedData;
 }
 
 function onUserLoginErr(xhr){
@@ -363,7 +369,11 @@ function menuUrlMatchesCurrentPage(menuUrl, currentPath) {
 		return false;
 	}
 
-	return currentPath === menuPath || currentPath.endsWith("/" + menuPath);
+	if (currentPath === menuPath || currentPath.endsWith("/" + menuPath)) {
+		return true;
+	}
+
+	return menuPageFamilyMatches(menuPath, currentPath);
 }
 
 function normalizeMenuPath(url) {
@@ -381,6 +391,48 @@ function normalizeMenuPath(url) {
 	}
 
 	return normalizedUrl;
+}
+
+function menuPageFamilyMatches(menuPath, currentPath) {
+	var menuFamily = getMenuPageFamily(menuPath);
+	var currentFamily = getMenuPageFamily(currentPath);
+
+	if (!menuFamily || !currentFamily || menuFamily.name !== currentFamily.name) {
+		return false;
+	}
+
+	if (menuFamily.directory && currentFamily.directory) {
+		return menuFamily.directory === currentFamily.directory || currentFamily.directory.endsWith("/" + menuFamily.directory);
+	}
+
+	return true;
+}
+
+function getMenuPageFamily(path) {
+	var cleanPath = normalizeMenuPath(path);
+	var parts = cleanPath.split("/");
+	var fileName = parts.pop() || "";
+	var directory = parts.join("/");
+	var pageName = fileName.replace(/\.html?$/i, "");
+
+	if (!pageName) {
+		return null;
+	}
+
+	pageName = pageName
+		.replace(/_?(add|edit)$/i, "")
+		.replace(/_?(inq|inquiry)$/i, "")
+		.replace(/[^a-z0-9]/gi, "")
+		.toLowerCase();
+
+	if (!pageName) {
+		return null;
+	}
+
+	return {
+		directory: directory,
+		name: pageName
+	};
 }
 
 function markNearestParentMenu(activeRow) {

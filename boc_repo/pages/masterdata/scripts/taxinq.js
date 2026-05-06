@@ -9,6 +9,7 @@ $(document).ready(function () {
   taxTemplate = $("#listTmpl").html();
   taxes = [];
   $("#taxTableSearch").on("input", filterTaxTable);
+  setupTaxInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupTaxInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_tax?page=1&limit=5000", [
+    { selector: "#taxCodeSearch", hiddenSelector: "#taxCodeSearchId", valueField: "tax_code", idField: "tax_id" },
+    { selector: "#taxNameSearch", hiddenSelector: "#taxNameSearchId", valueField: "tax_name", idField: "tax_id" }
+  ]);
 }
 
 function search() {

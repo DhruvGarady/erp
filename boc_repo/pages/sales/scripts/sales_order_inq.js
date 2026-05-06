@@ -9,6 +9,7 @@ $(document).ready(function () {
   salesOrderTemplate = $("#listTmpl").html();
   salesOrderData = [];
   $("#salesOrderTableSearch").on("input", filterSalesOrderTable);
+  setupSalesOrderInquiryAutocomplete();
   renderList([]);
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupSalesOrderInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/salesorder/list", [
+    { selector: "#salesOrderNoSearch", hiddenSelector: "#salesOrderNoSearchId", valueField: "sales_order_no", idField: "sales_order_id" },
+    { selector: "#customerSearch", hiddenSelector: "#customerSearchId", valueField: "customer_name", idField: "customer_id" }
+  ]);
 }
 
 function search() {

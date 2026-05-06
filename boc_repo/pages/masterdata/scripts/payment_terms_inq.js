@@ -9,6 +9,7 @@ $(document).ready(function () {
   paymentTermsTemplate = $("#listTmpl").html();
   paymentTerms = [];
   $("#paymentTermsTableSearch").on("input", filterPaymentTermsTable);
+  setupPaymentTermsInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupPaymentTermsInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_payment_terms?page=1&limit=5000", [
+    { selector: "#termCodeSearch", hiddenSelector: "#termCodeSearchId", valueField: "payment_term_code", idField: "payment_term_id" },
+    { selector: "#termNameSearch", hiddenSelector: "#termNameSearchId", valueField: "payment_term_name", idField: "payment_term_id" }
+  ]);
 }
 
 function search() {

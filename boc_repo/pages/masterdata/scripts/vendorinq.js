@@ -9,6 +9,7 @@ $(document).ready(function () {
   vendorTemplate = $("#listTmpl").html();
   vendors = [];
   $("#vendorTableSearch").on("input", filterVendorTable);
+  setupVendorInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupVendorInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_vendor?page=1&limit=5000", [
+    { selector: "#vendorCodeSearch", hiddenSelector: "#vendorCodeSearchId", valueField: "vendor_code", idField: "vendor_id" },
+    { selector: "#vendorNameSearch", hiddenSelector: "#vendorNameSearchId", valueField: "vendor_name", idField: "vendor_id" }
+  ]);
 }
 
 function search() {

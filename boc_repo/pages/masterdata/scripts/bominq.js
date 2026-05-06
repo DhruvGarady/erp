@@ -9,6 +9,7 @@ $(document).ready(function () {
   bomTemplate = $("#listTmpl").html();
   boms = [];
   $("#bomTableSearch").on("input", filterBomTable);
+  setupBomInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupBomInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_bom?page=1&limit=5000", [
+    { selector: "#bomCodeSearch", hiddenSelector: "#bomCodeSearchId", valueField: "bom_code", idField: "bom_id" },
+    { selector: "#bomNameSearch", hiddenSelector: "#bomNameSearchId", valueField: "bom_name", idField: "bom_id" }
+  ]);
 }
 
 function search() {

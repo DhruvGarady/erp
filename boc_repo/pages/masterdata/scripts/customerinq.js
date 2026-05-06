@@ -9,6 +9,7 @@ $(document).ready(function () {
   customerTemplate = $("#listTmpl").html();
   customers = [];
   $("#customerTableSearch").on("input", filterCustomerTable);
+  setupCustomerInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupCustomerInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_customer?page=1&limit=5000", [
+    { selector: "#customerCodeSearch", hiddenSelector: "#customerCodeSearchId", valueField: "customer_code", idField: "customer_id" },
+    { selector: "#customerNameSearch", hiddenSelector: "#customerNameSearchId", valueField: "customer_name", idField: "customer_id" }
+  ]);
 }
 
 function search() {

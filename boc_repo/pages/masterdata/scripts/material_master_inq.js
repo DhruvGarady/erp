@@ -11,6 +11,7 @@ $(document).ready(function () {
   materialTemplate = $("#listTmpl").html();
   materials = [];
   $("#materialTableSearch").on("input", filterMaterialTable);
+  setupMaterialInquiryAutocomplete();
   renderList();
 
   loadLookups()
@@ -29,6 +30,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupMaterialInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_material?page=1&limit=5000", [
+    { selector: "#materialCodeSearch", hiddenSelector: "#materialCodeSearchId", valueField: "material_code", idField: "material_id" },
+    { selector: "#materialNameSearch", hiddenSelector: "#materialNameSearchId", valueField: "material_name", idField: "material_id" }
+  ]);
 }
 
 function getMasterList(tableName, params) {

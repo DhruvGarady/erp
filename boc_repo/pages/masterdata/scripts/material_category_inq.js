@@ -9,6 +9,7 @@ $(document).ready(function () {
   categoryTemplate = $("#listTmpl").html();
   categories = [];
   $("#categoryTableSearch").on("input", filterCategoryTable);
+  setupCategoryInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupCategoryInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_material_group?page=1&limit=5000", [
+    { selector: "#categoryCodeSearch", hiddenSelector: "#categoryCodeSearchId", valueField: "material_group_code", idField: "material_group_id" },
+    { selector: "#categoryNameSearch", hiddenSelector: "#categoryNameSearchId", valueField: "material_group_name", idField: "material_group_id" }
+  ]);
 }
 
 function search() {

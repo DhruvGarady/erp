@@ -9,6 +9,7 @@ $(document).ready(function () {
   quotationTemplate = $("#listTmpl").html();
   quotationData = [];
   $("#quotationTableSearch").on("input", filterQuotationTable);
+  setupQuotationInquiryAutocomplete();
   renderList([]);
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupQuotationInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/quotation/list", [
+    { selector: "#quotationNoSearch", hiddenSelector: "#quotationNoSearchId", valueField: "quotation_no", idField: "quotation_id" },
+    { selector: "#customerSearch", hiddenSelector: "#customerSearchId", valueField: "customer_name", idField: "customer_id" }
+  ]);
 }
 
 function search() {

@@ -9,6 +9,7 @@ $(document).ready(function () {
   currencyTemplate = $("#listTmpl").html();
   currencies = [];
   $("#currencyTableSearch").on("input", filterCurrencyTable);
+  setupCurrencyInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupCurrencyInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_currency?page=1&limit=5000", [
+    { selector: "#currencyCodeSearch", hiddenSelector: "#currencyCodeSearchId", valueField: "currency_code", idField: "currency_id" },
+    { selector: "#currencyNameSearch", hiddenSelector: "#currencyNameSearchId", valueField: "currency_name", idField: "currency_id" }
+  ]);
 }
 
 function search() {

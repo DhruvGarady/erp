@@ -589,6 +589,124 @@ function normalizeFeatureSearchText(value) {
 	return $.trim(String(value || "").toLowerCase());
 }
 
+function setupApiAutocompleteList(strURL, fieldConfigs) {
+	if (!strURL || !fieldConfigs || typeof $.fn.autocomplete !== "function") {
+		return;
+	}
+
+	var rows = [];
+
+	try {
+		rows = getAPIdata(strURL);
+	} catch (e) {
+		console.error("Autocomplete data load failed:", e);
+		rows = [];
+	}
+
+	if (rows && rows.data) {
+		rows = rows.data;
+	}
+
+	_.each(fieldConfigs, function(config) {
+		var itemList = buildApiAutocompleteItems(rows || [], config.valueField || config.valueFields, config.idField);
+		setupAutocompleteField(config.selector, config.hiddenSelector, itemList);
+	});
+}
+
+function buildApiAutocompleteItems(rows, valueFields, idField) {
+	var fields = $.isArray(valueFields) ? valueFields : [valueFields];
+	var itemList = [];
+	var seen = {};
+
+	_.each(rows || [], function(row) {
+		var value = getAutocompleteDisplayValue(row, fields);
+		var key = normalizeFeatureSearchText(value);
+
+		if (!value || seen[key]) {
+			return;
+		}
+
+		seen[key] = true;
+		itemList.push({
+			label: value,
+			value: value,
+			id: row && idField ? row[idField] : null
+		});
+	});
+
+	return itemList;
+}
+
+function getAutocompleteDisplayValue(row, fields) {
+	var parts = [];
+
+	_.each(fields || [], function(field) {
+		var value = row && row[field] != null ? $.trim(String(row[field])) : "";
+		if (value) {
+			parts.push(value);
+		}
+	});
+
+	return parts.join(" ");
+}
+
+function setupAutocompleteField(inputSelector, hiddenSelector, itemList) {
+	var input = $(inputSelector);
+
+	if (input.length == 0) {
+		return;
+	}
+
+	var hiddenInput = getAutocompleteHiddenInput(input, hiddenSelector);
+
+	if (input.data("ui-autocomplete")) {
+		input.autocomplete("destroy");
+	}
+
+	input.attr("autocomplete", "off");
+	input.autocomplete({
+		source: itemList || [],
+		minLength: 0,
+		focus: function() {
+			return false;
+		},
+		select: function(event, ui) {
+			input.val(ui.item.value);
+			hiddenInput.val(ui.item.id || "");
+			return false;
+		},
+		change: function(event, ui) {
+			if (ui.item == null || ui.item == undefined) {
+				input.val("");
+				hiddenInput.val("");
+			}
+		}
+	});
+
+	input.off("focus.apiAutocomplete").on("focus.apiAutocomplete", function() {
+		$(this).autocomplete("search", $(this).val());
+	});
+
+	input.off("input.apiAutocomplete").on("input.apiAutocomplete", function() {
+		hiddenInput.val("");
+	});
+}
+
+function getAutocompleteHiddenInput(input, hiddenSelector) {
+	if (hiddenSelector && $(hiddenSelector).length > 0) {
+		return $(hiddenSelector);
+	}
+
+	var inputId = input.attr("id");
+	var hiddenId = hiddenSelector ? hiddenSelector.replace(/^#/, "") : inputId + "Id";
+
+	if ($("#" + hiddenId).length == 0) {
+		input.after('<input type="hidden" id="' + hiddenId + '" name="' + hiddenId + '">');
+	}
+
+	return $("#" + hiddenId);
+}
+
 /*function capitalizeWords(str) {
     return str.replace(/\b\w/g, function(char) {
         return char.toUpperCase();

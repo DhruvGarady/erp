@@ -9,6 +9,7 @@ $(document).ready(function () {
   uomTemplate = $("#listTmpl").html();
   uoms = [];
   $("#uomTableSearch").on("input", filterUomTable);
+  setupUomInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,13 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupUomInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_uom?page=1&limit=5000", [
+    { selector: "#uomCodeSearch", hiddenSelector: "#uomCodeSearchId", valueField: "uom_code", idField: "uom_id" },
+    { selector: "#uomNameSearch", hiddenSelector: "#uomNameSearchId", valueField: "uom_name", idField: "uom_id" }
+  ]);
 }
 
 function search() {

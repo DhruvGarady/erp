@@ -9,6 +9,7 @@ $(document).ready(function () {
   warehouseTemplate = $("#listTmpl").html();
   warehouses = [];
   $("#warehouseTableSearch").on("input", filterWarehouseTable);
+  setupWarehouseInquiryAutocomplete();
   renderList();
   search();
 });
@@ -19,6 +20,14 @@ function getAuthHeaders() {
     return {};
   }
   return { Authorization: "Bearer " + token };
+}
+
+function setupWarehouseInquiryAutocomplete() {
+  setupApiAutocompleteList(request_url + "/api/v1/mst_warehouse?page=1&limit=5000", [
+    { selector: "#warehouseCodeSearch", hiddenSelector: "#warehouseCodeSearchId", valueField: "warehouse_code", idField: "warehouse_id" },
+    { selector: "#warehouseNameSearch", hiddenSelector: "#warehouseNameSearchId", valueField: "warehouse_name", idField: "warehouse_id" },
+    { selector: "#citySearch", hiddenSelector: "#citySearchId", valueField: "city", idField: "warehouse_id" }
+  ]);
 }
 
 function search() {

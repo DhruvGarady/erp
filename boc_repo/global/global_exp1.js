@@ -4,9 +4,25 @@ var myPage;
 var parentFeatures;
 var menuTemplateHtml;
 $(function() {
-
+	loadUserProfileSettingsScript();
 
 });
+
+function loadUserProfileSettingsScript() {
+	if (window.userProfileSettingsScriptLoaded) {
+		return;
+	}
+
+	var scriptBase = "global/";
+	var currentScript = $("script[src*='global_exp1.js']").last().attr("src") || "";
+
+	if (currentScript) {
+		scriptBase = currentScript.replace(/global_exp1\.js.*$/i, "");
+	}
+
+	window.userProfileSettingsScriptLoaded = true;
+	$.getScript(scriptBase + "user_profile_settings.js");
+}
 
 
 function isUserLoggedIn(){
@@ -92,6 +108,7 @@ function onUserLoginSuccess(response) {
 	sessionStorage.setItem("USER_ID", user && user.user_id ? user.user_id : "");
 	sessionStorage.setItem("USERNAME", user && user.username ? user.username : "");
 	sessionStorage.setItem("FULL_NAME", user && user.full_name ? user.full_name : (user && user.username ? user.username : ""));
+	sessionStorage.setItem("EMAIL", user && user.email ? user.email : "");
 	sessionStorage.setItem("ROLE_NAME", user && user.role_name ? user.role_name : "User");
 	sessionStorage.setItem("PROFILE_PICTURE", response && response.profile_picture ? response.profile_picture : "https://lms-imgs.s3.ap-south-1.amazonaws.com/default-profilepic.jpg");
 
@@ -256,7 +273,7 @@ function setUsrName(){
 function functionLogout(){
 	sessionStorage.clear();
 	localStorage.clear();
-	location.href = "/boc_repo/index.html"
+	location.href = "/index.html"
 }
 
 

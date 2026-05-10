@@ -5,6 +5,18 @@ function now() {
 
 //----------------------------------------------------INVENTORY / STOCK MODULE------------------------------------------------
 
+function dbValue(value, fallback = null) {
+    if (value === undefined || value === null || value === "") {
+        return fallback;
+    }
+    return value;
+}
+
+function cleanNumber(value, fallback = 0) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+}
+
 function makeRowFromColumns(source, columns, defaults = {}) {
     const row = {};
     columns.forEach((col) => {
@@ -383,7 +395,8 @@ function registerInventoryDocumentRoutes(config) {
         itemColumns,
         headerDefaults,
         itemDefaults,
-        listColumns
+        listColumns,
+        afterCreate
     } = config;
 
     app.get(`${routeBase}/list`, verifyToken, (req, res) => {
@@ -483,6 +496,13 @@ function registerInventoryDocumentRoutes(config) {
                     });
 
                     if (!itemValues.length) {
+                        if (typeof afterCreate === "function") {
+                            return connection.rollback(() => {
+                                connection.release();
+                                res.status(400).json({ error: `At least one ${label} item is required` });
+                            });
+                        }
+
                         return connection.commit((commitErr) => {
                             connection.release();
                             if (commitErr) return res.status(500).json({ error: "Commit failed" });
@@ -491,12 +511,37 @@ function registerInventoryDocumentRoutes(config) {
                     }
 
                     const itemSql = `INSERT INTO ${itemTable} (${itemInsertColumns.join(", ")}) VALUES ?`;
-                    connection.query(itemSql, [itemValues], (itemErr) => {
+                    connection.query(itemSql, [itemValues], (itemErr, itemResult) => {
                         if (itemErr) {
                             return connection.rollback(() => {
                                 connection.release();
                                 console.error(`POST ${routeBase}/create items error:`, itemErr);
                                 res.status(500).json({ error: `Failed to create ${label} items` });
+                            });
+                        }
+
+                        if (typeof afterCreate === "function") {
+                            return afterCreate(connection, {
+                                headerId,
+                                header: headerRow,
+                                items,
+                                itemInsertId: itemResult.insertId,
+                                dateNow,
+                                req
+                            }, (afterCreateErr) => {
+                                if (afterCreateErr) {
+                                    return connection.rollback(() => {
+                                        connection.release();
+                                        console.error(`POST ${routeBase}/create after create error:`, afterCreateErr);
+                                        res.status(500).json({ error: afterCreateErr.message || `Failed to post ${label}` });
+                                    });
+                                }
+
+                                connection.commit((commitErr) => {
+                                    connection.release();
+                                    if (commitErr) return res.status(500).json({ error: "Commit failed" });
+                                    res.json({ success: true, id: headerId });
+                                });
                             });
                         }
 
@@ -657,6 +702,177 @@ function registerInventoryDocumentRoutes(config) {
     });
 }
 
+function postGoodsReceiptStock(connection, context, done) {
+    const header = context.header || {};
+    const items = context.items || [];
+    const headerId = context.headerId;
+    const firstItemId = context.itemInsertId || 0;
+    const dateNow = context.dateNow;
+    const warehouseId = header.warehouse_id;
+    const createdBy = header.created_by || header.updated_by || (context.req.user && context.req.user.user_id) || null;
+
+    if (!warehouseId) {
+        return done(new Error("Warehouse is required for stock entry"));
+    }
+
+    const activeItems = items.filter((item) => cleanNumber(item.received_qty, 0) > 0 && item.material_id);
+
+    if (!activeItems.length) {
+        return done(new Error("At least one material with received quantity is required"));
+    }
+
+    if (activeItems.length !== items.length) {
+        return done(new Error("Every goods receipt item must have material and received quantity greater than zero"));
+    }
+
+    const ledgerColumns = STOCK_LEDGER_COLUMNS.filter(col => col !== "ledger_id");
+    const ledgerValues = activeItems.map((item, index) => {
+        const qty = cleanNumber(item.received_qty, 0);
+        const rate = cleanNumber(item.rate, 0);
+        const lineAmount = cleanNumber(item.line_amount, qty * rate);
+        const lineId = firstItemId ? firstItemId + index : null;
+        const ledgerRow = {
+            material_id: item.material_id,
+            warehouse_id: warehouseId,
+            txn_type: "GOODS_RECEIPT",
+            direction: "IN",
+            qty: qty,
+            uom_id: dbValue(item.uom_id),
+            reference_type: "GOODS_RECEIPT",
+            reference_id: headerId,
+            reference_no: header.goods_receipt_no,
+            line_id: lineId,
+            txn_date: dateNow,
+            rate: rate,
+            amount: lineAmount,
+            remarks: item.remarks || header.remarks || null,
+            created_by: createdBy,
+            created_at: dateNow,
+            updated_at: dateNow,
+            is_active: "Y"
+        };
+
+        return ledgerColumns.map(col => dbValue(ledgerRow[col]));
+    });
+
+    const ledgerSql = `INSERT INTO stock_ledger (${ledgerColumns.join(", ")}) VALUES ?`;
+    connection.query(ledgerSql, [ledgerValues], (ledgerErr) => {
+        if (ledgerErr) {
+            return done(ledgerErr);
+        }
+
+        const summaryRows = aggregateGoodsReceiptSummaryRows(activeItems, warehouseId);
+        updateGoodsReceiptInventorySummary(connection, summaryRows, dateNow, done);
+    });
+}
+
+function aggregateGoodsReceiptSummaryRows(items, warehouseId) {
+    const rowMap = {};
+
+    items.forEach((item) => {
+        const key = `${item.material_id}_${warehouseId}`;
+        const qty = cleanNumber(item.received_qty, 0);
+
+        if (!rowMap[key]) {
+            rowMap[key] = {
+                material_id: item.material_id,
+                warehouse_id: warehouseId,
+                qty: 0,
+                uom_id: dbValue(item.uom_id)
+            };
+        }
+
+        rowMap[key].qty += qty;
+
+        if (!rowMap[key].uom_id && item.uom_id) {
+            rowMap[key].uom_id = item.uom_id;
+        }
+    });
+
+    return Object.keys(rowMap).map(key => rowMap[key]);
+}
+
+function updateGoodsReceiptInventorySummary(connection, summaryRows, dateNow, done) {
+    let index = 0;
+
+    function next() {
+        if (index >= summaryRows.length) {
+            return done();
+        }
+
+        const row = summaryRows[index++];
+        const selectSql = `
+            SELECT inventory_summary_id
+            FROM inventory_summary
+            WHERE material_id = ?
+              AND warehouse_id = ?
+              AND is_active = 'Y'
+            LIMIT 1
+        `;
+
+        connection.query(selectSql, [row.material_id, row.warehouse_id], (selectErr, rows) => {
+            if (selectErr) {
+                return done(selectErr);
+            }
+
+            if (rows.length > 0) {
+                const updateSql = `
+                    UPDATE inventory_summary
+                    SET available_qty = (on_hand_qty + ?) - reserved_qty,
+                        on_hand_qty = on_hand_qty + ?,
+                        uom_id = COALESCE(?, uom_id),
+                        last_in_qty = ?,
+                        last_txn_date = ?,
+                        last_txn_type = 'GOODS_RECEIPT',
+                        status = 'Available',
+                        updated_at = ?
+                    WHERE inventory_summary_id = ?
+                `;
+
+                return connection.query(
+                    updateSql,
+                    [row.qty, row.qty, row.uom_id, row.qty, dateNow, dateNow, rows[0].inventory_summary_id],
+                    (updateErr) => {
+                        if (updateErr) return done(updateErr);
+                        next();
+                    }
+                );
+            }
+
+            const insertSql = `
+                INSERT INTO inventory_summary (
+                    material_id,
+                    warehouse_id,
+                    available_qty,
+                    reserved_qty,
+                    on_hand_qty,
+                    in_transit_qty,
+                    uom_id,
+                    last_in_qty,
+                    last_out_qty,
+                    last_txn_date,
+                    last_txn_type,
+                    status,
+                    created_at,
+                    updated_at,
+                    is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+
+            connection.query(
+                insertSql,
+                [row.material_id, row.warehouse_id, row.qty, 0, row.qty, 0, row.uom_id, row.qty, 0, dateNow, "GOODS_RECEIPT", "Available", dateNow, dateNow, "Y"],
+                (insertErr) => {
+                    if (insertErr) return done(insertErr);
+                    next();
+                }
+            );
+        });
+    }
+
+    next();
+}
+
 registerInventoryDocumentRoutes({
     routeBase: "/delivery",
     label: "delivery",
@@ -690,7 +906,8 @@ registerInventoryDocumentRoutes({
     itemColumns: GOODS_RECEIPT_ITEM_COLUMNS,
     headerDefaults: { status: "Draft" },
     itemDefaults: {},
-    listColumns: ["goods_receipt_id", "goods_receipt_no", "goods_receipt_date", "reference_type", "reference_no", "vendor_id", "vendor_name", "warehouse_id", "status", "created_at", "updated_at", "is_active"]
+    listColumns: ["goods_receipt_id", "goods_receipt_no", "goods_receipt_date", "reference_type", "reference_no", "vendor_id", "vendor_name", "warehouse_id", "status", "created_at", "updated_at", "is_active"],
+    afterCreate: postGoodsReceiptStock
 });
 
 registerInventoryDocumentRoutes({

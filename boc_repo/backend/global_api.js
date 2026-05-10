@@ -53,6 +53,32 @@ function getFrontendBaseUrl(req) {
     return normalizeFrontendBaseUrl(getRequestBaseUrl(req));
 }
 
+function getFrontendRootBaseUrl(req) {
+    if (process.env.APP_BASE_URL) {
+        return normalizeFrontendBaseUrl(process.env.APP_BASE_URL).replace(/\/+$/, "");
+    }
+
+    const referer = req.get("referer") || "";
+
+    if (referer) {
+        try {
+            const refererUrl = new URL(referer);
+            const pathParts = refererUrl.pathname.split("/").filter(Boolean);
+            const isLiveServer = ["5500", "5501"].includes(refererUrl.port);
+
+            if (isLiveServer && pathParts.length > 0) {
+                return `${refererUrl.origin}/${pathParts[0]}`.replace(/\/+$/, "");
+            }
+
+            return refererUrl.origin.replace(/\/+$/, "");
+        } catch (err) {
+            console.error("Frontend root URL parse error:", err);
+        }
+    }
+
+    return normalizeFrontendBaseUrl(getRequestBaseUrl(req)).replace(/\/+$/, "");
+}
+
 function getActivationRedirectUrl(req, pageName) {
     let redirectBase = normalizeFrontendBaseUrl(req.query.redirect || process.env.APP_BASE_URL || getRequestBaseUrl(req));
 
@@ -76,7 +102,7 @@ function normalizeFrontendBaseUrl(baseUrl) {
 
     try {
         const url = new URL(baseUrl);
-        const repoFolder = String(__dirname || "").split(/[\\/]/).pop();
+        const repoFolder = String(process.cwd() || __dirname || "").split(/[\\/]/).pop();
         const isLiveServer = ["5500", "5501"].includes(url.port);
         const needsRepoPath = isLiveServer && repoFolder && url.pathname.replace(/\/+$/, "") === "";
 
@@ -119,6 +145,34 @@ function buildActivationEmailHtml(fullName, activationLink) {
                     </a>
                     <p style="margin:22px 0 0;color:#7c8ba5;font-size:12px;line-height:1.6;">
                         This activation link will expire in 24 hours. If the button does not work, copy and paste this link into your browser:<br>
+                        <span style="word-break:break-all;color:#2072f3;">${safeLink}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function buildPasswordResetEmailHtml(fullName, resetLink) {
+    const safeName = escapeEmailHtml(fullName || "there");
+    const safeLink = escapeEmailHtml(resetLink);
+
+    return `
+        <div style="margin:0;padding:24px;background:#eef4fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+            <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #d8e2f1;border-radius:16px;overflow:hidden;">
+                <div style="padding:24px 28px;background:#f8fbff;border-bottom:1px solid #d8e2f1;text-align:center;">
+                    <div style="font-size:24px;font-weight:bold;color:#07152f;">CoreFlow <span style="color:#2072f3;">ERP</span></div>
+                </div>
+                <div style="padding:30px 32px;">
+                    <h2 style="margin:0 0 10px;color:#07152f;font-size:24px;line-height:1.25;">Reset your password</h2>
+                    <p style="margin:0 0 18px;color:#52617a;font-size:14px;line-height:1.6;">
+                        Hi ${safeName}, use the button below to set a new password for your CoreFlow ERP account.
+                    </p>
+                    <a href="${safeLink}" style="display:inline-block;padding:12px 20px;background:#2072f3;color:#ffffff;text-decoration:none;border-radius:10px;font-size:14px;font-weight:bold;">
+                        Reset Password
+                    </a>
+                    <p style="margin:22px 0 0;color:#7c8ba5;font-size:12px;line-height:1.6;">
+                        This password reset link will expire in 30 minutes. If the button does not work, copy and paste this link into your browser:<br>
                         <span style="word-break:break-all;color:#2072f3;">${safeLink}</span>
                     </p>
                 </div>
@@ -371,6 +425,270 @@ app.get("/user/activate", (req, res) => {
 
             return res.redirect(getActivationRedirectUrl(req, "activation-success.html"));
         });
+    });
+});
+
+app.get("/user/profile", verifyToken, (req, res) => {
+    const userId = req.user && req.user.user_id;
+
+    if (!userId) {
+        return res.status(401).json({ error: "Invalid user session" });
+    }
+
+    const sql = `
+        SELECT user_id, full_name, username, email, role_name
+        FROM boc_user
+        WHERE user_id = ?
+          AND is_active = 'Y'
+        LIMIT 1
+    `;
+
+    pool.query(sql, [userId], (err, rows) => {
+        if (err) {
+            console.error("Profile fetch error:", err);
+            return res.status(500).json({ error: "Failed to fetch profile details" });
+        }
+
+        if (!rows.length) {
+            return res.status(404).json({ error: "User profile not found" });
+        }
+
+        return res.json(rows[0]);
+    });
+});
+
+app.put("/user/profile", verifyToken, (req, res) => {
+    const userId = req.user && req.user.user_id;
+    const fullName = (req.body.full_name || "").trim();
+    const email = (req.body.email || "").trim();
+
+    if (!userId) {
+        return res.status(401).json({ error: "Invalid user session" });
+    }
+
+    if (!fullName || !email) {
+        return res.status(400).json({ error: "Full name and email are required" });
+    }
+
+    const duplicateSql = `
+        SELECT user_id
+        FROM boc_user
+        WHERE LOWER(email) = LOWER(?)
+          AND user_id <> ?
+        LIMIT 1
+    `;
+
+    pool.query(duplicateSql, [email, userId], (duplicateErr, duplicateRows) => {
+        if (duplicateErr) {
+            console.error("Profile duplicate email check error:", duplicateErr);
+            return res.status(500).json({ error: "Failed to validate email" });
+        }
+
+        if (duplicateRows.length > 0) {
+            return res.status(400).json({ error: "Email is already used by another user" });
+        }
+
+        const updateSql = `
+            UPDATE boc_user
+            SET full_name = ?,
+                email = ?,
+                updated_by = ?,
+                updated_at = ?
+            WHERE user_id = ?
+              AND is_active = 'Y'
+        `;
+
+        pool.query(updateSql, [fullName, email, userId, now(), userId], (updateErr, result) => {
+            if (updateErr) {
+                console.error("Profile update error:", updateErr);
+                return res.status(500).json({ error: "Failed to update profile details" });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "User profile not found" });
+            }
+
+            return res.json({
+                success: true,
+                message: "Profile updated successfully",
+                user: {
+                    user_id: userId,
+                    full_name: fullName,
+                    username: req.user.username,
+                    email: email,
+                    role_name: req.user.role_name
+                }
+            });
+        });
+    });
+});
+
+app.put("/user/profile/password", verifyToken, async (req, res) => {
+    const userId = req.user && req.user.user_id;
+    const password = req.body.password || "";
+    const confirmPassword = req.body.confirm_password || req.body.re_enter_password || "";
+
+    if (!userId) {
+        return res.status(401).json({ error: "Invalid user session" });
+    }
+
+    if (!password || !confirmPassword) {
+        return res.status(400).json({ error: "Password and re-enter password are required" });
+    }
+
+    if (password !== confirmPassword) {
+        return res.status(400).json({ error: "Passwords do not match" });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+    }
+
+    try {
+        const passwordHash = await bcrypt.hash(password, saltRounds);
+        const updateSql = `
+            UPDATE boc_user
+            SET password_hash = ?,
+                updated_by = ?,
+                updated_at = ?
+            WHERE user_id = ?
+              AND is_active = 'Y'
+        `;
+
+        pool.query(updateSql, [passwordHash, userId, now(), userId], (updateErr, result) => {
+            if (updateErr) {
+                console.error("Profile password update error:", updateErr);
+                return res.status(500).json({ error: "Failed to update password" });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "User profile not found" });
+            }
+
+            return res.json({
+                success: true,
+                message: "Password updated successfully"
+            });
+        });
+    } catch (err) {
+        console.error("Profile password hash error:", err);
+        return res.status(500).json({ error: "Failed to update password" });
+    }
+});
+
+app.post("/user/password-reset/request", verifyToken, (req, res) => {
+    const userId = req.user && req.user.user_id;
+
+    if (!userId) {
+        return res.status(401).json({ error: "Invalid user session" });
+    }
+
+    const sql = `
+        SELECT user_id, full_name, email
+        FROM boc_user
+        WHERE user_id = ?
+          AND is_active = 'Y'
+        LIMIT 1
+    `;
+
+    pool.query(sql, [userId], async (err, rows) => {
+        if (err) {
+            console.error("Password reset user lookup error:", err);
+            return res.status(500).json({ error: "Failed to prepare password reset" });
+        }
+
+        if (!rows.length || !rows[0].email) {
+            return res.status(400).json({ error: "No active email is available for this user" });
+        }
+
+        const user = rows[0];
+        const resetToken = jwt.sign(
+            {
+                purpose: "password_reset",
+                user_id: user.user_id,
+                email: user.email
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "30m" }
+        );
+        const resetLink = `${getFrontendRootBaseUrl(req)}/password-reset.html?token=${encodeURIComponent(resetToken)}`;
+
+        try {
+            await getEmailTransporter().sendMail({
+                from: `"CoreFlow ERP" <${process.env.EMAIL_USER}>`,
+                to: user.email,
+                subject: "Reset your CoreFlow ERP password",
+                html: buildPasswordResetEmailHtml(user.full_name, resetLink)
+            });
+
+            return res.json({
+                success: true,
+                message: "Password reset email sent successfully"
+            });
+        } catch (mailErr) {
+            console.error("Password reset email error:", mailErr);
+            return res.status(500).json({ error: "Password reset email could not be sent" });
+        }
+    });
+});
+
+app.post("/user/password-reset/confirm", async (req, res) => {
+    const token = req.body.token || "";
+    const password = req.body.password || "";
+    const confirmPassword = req.body.confirm_password || req.body.re_enter_password || "";
+
+    if (!token) {
+        return res.status(400).json({ error: "Password reset token is required" });
+    }
+
+    if (!password || !confirmPassword) {
+        return res.status(400).json({ error: "Password and re-enter password are required" });
+    }
+
+    if (password !== confirmPassword) {
+        return res.status(400).json({ error: "Passwords do not match" });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, async (verifyErr, decoded) => {
+        if (verifyErr || !decoded || decoded.purpose !== "password_reset") {
+            return res.status(400).json({ error: "Invalid or expired password reset link" });
+        }
+
+        try {
+            const passwordHash = await bcrypt.hash(password, saltRounds);
+            const updateSql = `
+                UPDATE boc_user
+                SET password_hash = ?,
+                    updated_by = ?,
+                    updated_at = ?
+                WHERE user_id = ?
+                  AND LOWER(email) = LOWER(?)
+                  AND is_active = 'Y'
+            `;
+
+            pool.query(updateSql, [passwordHash, decoded.user_id, now(), decoded.user_id, decoded.email], (updateErr, result) => {
+                if (updateErr) {
+                    console.error("Password reset confirm error:", updateErr);
+                    return res.status(500).json({ error: "Failed to reset password" });
+                }
+
+                if (result.affectedRows === 0) {
+                    return res.status(404).json({ error: "User account was not found or is inactive" });
+                }
+
+                return res.json({
+                    success: true,
+                    message: "Password reset successfully"
+                });
+            });
+        } catch (hashErr) {
+            console.error("Password reset hash error:", hashErr);
+            return res.status(500).json({ error: "Failed to reset password" });
+        }
     });
 });
 

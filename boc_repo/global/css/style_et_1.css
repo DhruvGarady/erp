@@ -95,6 +95,19 @@ html, body {
 	background: #3675ff;
 	border: none;
 }
+
+.dropdown-menu .dropdown-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 600;
+}
+
+.profile-menu-icon {
+	font-size: 18px;
+	color: #536475;
+}
+
 /* -------------Menu--------------- */
 .mainNav{
 	padding-left: 5px !important;
@@ -511,4 +524,144 @@ label {
 .nav-tabs .nav-link {
     outline: none !important;
     box-shadow: none !important;
+}
+
+/* User profile popup */
+.user-profile-dialog {
+	border-radius: 10px;
+	overflow: hidden;
+	border: 1px solid #d9e3f1 !important;
+	box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+}
+
+.user-profile-dialog .ui-dialog-content {
+	padding: 0 !important;
+}
+
+.user-profile-dialog-content {
+	background: #fff;
+	color: #1f2937;
+}
+
+.profile-settings-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 14px;
+	padding: 20px 22px;
+	background: #f6f9ff;
+	border-bottom: 1px solid #d9e3f1;
+}
+
+.profile-settings-heading {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	min-width: 0;
+}
+
+.profile-settings-avatar {
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	background: #3675ff;
+	color: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 800;
+	letter-spacing: 0;
+}
+
+.profile-settings-title {
+	font-size: 20px;
+	font-weight: 700;
+	color: #152033;
+	line-height: 1.2;
+}
+
+.profile-settings-subtitle {
+	margin-top: 4px;
+	font-size: 12px;
+	color: #607089;
+}
+
+.profile-settings-close {
+	width: 34px;
+	height: 34px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid #cdd8e8;
+	border-radius: 8px;
+	background: #fff;
+	color: #536475;
+	cursor: pointer;
+}
+
+.profile-settings-close:hover {
+	background: #eef4ff;
+	color: #1f4fbf;
+}
+
+.profile-settings-close:focus {
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(54, 117, 255, 0.18);
+}
+
+.profile-settings-tabs {
+	padding: 14px 22px 0;
+	background: #fff;
+	border-bottom: 1px solid #d9e3f1;
+}
+
+.profile-settings-tabs .nav-link {
+	font-weight: 700;
+	font-size: 13px;
+}
+
+.profile-settings-body {
+	padding: 20px 22px 22px;
+}
+
+.profile-settings-actions {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	margin-top: 12px;
+}
+
+.profile-settings-actions-split {
+	justify-content: space-between;
+	gap: 16px;
+}
+
+.profile-reset-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.profile-reset-actions .searchButton {
+	width: auto !important;
+	background-color: #536475;
+}
+
+.profile-forgot-label {
+	color: #65748b;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+@media (max-width: 768px) {
+	.user-profile-dialog {
+		width: calc(100vw - 24px) !important;
+		left: 12px !important;
+	}
+
+	.profile-settings-actions-split,
+	.profile-reset-actions {
+		align-items: stretch;
+		flex-direction: column;
+	}
 }

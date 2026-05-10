@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
 
-  <title>Currency Inquiry</title>
+  <title>Stock Entry By Warehouse</title>
   <link rel="shortcut icon" href="../../global/css/images/images.png">
 
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
@@ -26,7 +26,7 @@
   <script src="../../global/global_exp1.js" type="text/javascript"></script>
   <script src="../../global/properties.js" type="text/javascript"></script>
 
-  <script src="scripts/currencyinq.js"></script>
+  <script src="scripts/stock_entry_by_warehouseinq.js"></script>
 </head>
 
 <style>
@@ -41,7 +41,6 @@
 </style>
 
 <body>
-
   <nav class="navbar">
     <div class="container-fluid d-flex justify-content-between align-items-center mainNav">
       <div class="d-flex align-items-center">
@@ -102,53 +101,79 @@
       <div class="sectionDivHead">
         <table width="98%">
           <tr>
-            <td class="mainTblHdr">Currency Master:</td>
+            <td class="mainTblHdr">Stock Entry By Warehouse:</td>
           </tr>
         </table>
 
         <table width="99%">
           <tr>
-            <td width="18%" style="vertical-align:bottom;">
+            <td width="13%" style="vertical-align:bottom;">
               <div class="form-group" style="margin-bottom:none;">
-                Currency Code:
-                <input type="text" id="currencyCodeSearch" name="currencyCodeSearch">
+                GRN No:
+                <input type="text" id="grnNoSearch" name="grnNoSearch">
               </div>
             </td>
 
-            <td width="2%"></td>
+            <td width="1%"></td>
 
-            <td width="22%" style="vertical-align:bottom;">
+            <td width="17%" style="vertical-align:bottom;">
               <div class="form-group" style="margin-bottom:none;">
-                Currency Name:
-                <input type="text" id="currencyNameSearch" name="currencyNameSearch">
+                Vendor:
+                <input type="text" id="vendorSearch" name="vendorSearch">
               </div>
             </td>
 
-            <td width="2%"></td>
+            <td width="1%"></td>
 
-            <td width="12%" style="vertical-align:bottom;">
+            <td width="14%" style="vertical-align:bottom;">
+              <div class="form-group" style="margin-bottom:none;">
+                Warehouse:
+                <select id="warehouseSearch" name="warehouseSearch"></select>
+              </div>
+            </td>
+
+            <td width="1%"></td>
+
+            <td width="11%" style="vertical-align:bottom;">
+              <div class="form-group" style="margin-bottom:none;">
+                From Date:
+                <input type="date" id="fromDateSearch" name="fromDateSearch">
+              </div>
+            </td>
+
+            <td width="1%"></td>
+
+            <td width="11%" style="vertical-align:bottom;">
+              <div class="form-group" style="margin-bottom:none;">
+                To Date:
+                <input type="date" id="toDateSearch" name="toDateSearch">
+              </div>
+            </td>
+
+            <td width="1%"></td>
+
+            <td width="10%" style="vertical-align:bottom;">
               <div class="form-group" style="margin-bottom:none;">
                 Status:
                 <select id="statusSearch" name="statusSearch">
                   <option value="">ALL</option>
-                  <option value="Y">Active</option>
-                  <option value="N">Inactive</option>
+                  <option value="Posted">Posted</option>
+                  <option value="Draft">Draft</option>
+                  <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
             </td>
 
-            <td width="2%"></td>
+            <td width="1%"></td>
 
             <td width="20px" style="vertical-align:middle;">
               <input type="button" value="Search" onclick="search()" class="search">
             </td>
 
-            <td width="30%"></td>
-
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Currency" onclick="addCurrency()" class="search">
-                <div class="tooltip-text">Add new currency</div>
+                <input type="button" value="Add GRN" onclick="addStockEntry()" class="search">
+                <div class="tooltip-text">Add stock entry</div>
               </div>
             </td>
           </tr>
@@ -159,33 +184,35 @@
 
       <div class="sectionDiv">
         <div style="width:30%; margin-bottom:10px;">
-          <input type="text" id="currencyTableSearch" name="currencyTableSearch" placeholder="Search table...">
+          <input type="text" id="stockEntryTableSearch" name="stockEntryTableSearch" placeholder="Search table...">
         </div>
 
         <div id="listContainer2" class="tempalte">
           <script type="text/template" id="listTmpl">
             <table style="width:100%;" class="dataTbl">
               <tr>
-                <th width="12%">Code</th>
-                <th width="20%">Currency Name</th>
-                <th width="10%">Symbol</th>
-                <th width="45%">Description</th>
-                <th width="7%">Status</th>
-                <th width="3%">Edit</th>
-                <th width="3%" style="text-align:center;">Del</th>
+                <th width="9%">GRN No</th>
+                <th width="9%">GRN Date</th>
+                <th width="10%">Reference</th>
+                <th width="14%">Vendor</th>
+                <th width="13%">Warehouse</th>
+                <th width="9%">Status</th>
+                <th width="11%">Created</th>
+                <th width="4%">View</th>
               </tr>
 
-              <%_.each(currencies, function(item){ %>
+              <%_.each(goodsReceipts, function(item){ %>
                 <tr>
-                  <td><b><%= item.currency_code || '' %></b></td>
-                  <td><%= item.currency_name || '' %></td>
-                  <td><%= item.currency_symbol || '' %></td>
-                  <td><%= item.description || '' %></td>
-                  <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editCurrency(<%= item.currency_id %>)">
-                    <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit Currency</div></div>
+                  <td><b><%= item.goods_receipt_no || '' %></b></td>
+                  <td><%= formatDate(item.goods_receipt_date) %></td>
+                  <td><%= item.reference_no || item.reference_type || '' %></td>
+                  <td><%= item.vendor_name || '' %></td>
+                  <td><%= warehouseName(item.warehouse_id) %></td>
+                  <td><%= item.status || '' %></td>
+                  <td><%= formatDate(item.created_at) %></td>
+                  <td onclick="viewStockEntry(<%= item.goods_receipt_id %>)">
+                    <div class="tooltip-wrapper"><i class="material-icons">visibility</i><div class="tooltip-text">View Stock Entry</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteCurrency(<%= item.currency_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>
@@ -194,7 +221,6 @@
       </div>
     </div>
   </div>
-
 </body>
 
 </html>

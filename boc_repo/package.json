@@ -2,9 +2,12 @@
   "name": "boc_repo",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "api.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node api.js",
+    "dev": "node api.js",
+    "check": "node --check api.js && node --check backend/logger.js && node --check backend/global_api.js && node --check backend/masterdata_api.js && node --check backend/sales_api.js && node --check backend/inventory_api.js && node --check global/global_exp1.js",
+    "test": "npm run check"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "moment": "^2.30.1",
     "mysql2": "^3.22.1",
-    "nodemailer": "^8.0.5"
+    "nodemailer": "^8.0.5",
+    "winston": "^3.19.0"
   }
 }

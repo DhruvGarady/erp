@@ -75,31 +75,7 @@
 
   <div class="row">
     <div class="col-sm-2 sideMenuDivCol">
-      <div id="menuContainer" style="overflow-y:auto;">
-        <script type="text/template" id="menuTmpl">
-          <%_.each(parentFeatures, function(item, index){ %>
-            <table class="menuTable" id="menuTable" style="width:100%; overflow-y:auto;">
-              <tr class="menuTr" id="menuTr" title="<%= item.feature_description %>">
-                <td class="menuTd" id="menuTd" width="10%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons"><%= item.icon %></i></td>
-                <td class="menuTd" id="menuTd" width="90%" onclick="linkPage('<%= item.feature_url %>')"><div class="tooltip-wrapper"><%= (item.feature_name) %><div class="tooltip-text"><%= (item.feature_description) %></div></div></td>
-                <% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
-                  <td class="menuTd" id="menuTd" width="1%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons">arrow_drop_down</i></td>
-                <% }%>
-              </tr>
-
-              <% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
-                <%_.each(item.childFeatures, function(oitem, index){ %>
-                  <tr class="menuTr" id="menuTr" title="<%= oitem.feature_description %>">
-                    <td class="submenuTd" id="submenuTd" width="10%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
-                    <td class="submenuTd" id="submenuTd" width="90%" onclick="linkPage('<%= oitem.feature_url %>')"><div class="tooltip-wrapper"><%= oitem.feature_name %><div class="tooltip-text"><%= (oitem.feature_description) %></div></div></td>
-                    <td class="submenuTd" id="submenuTd" width="1%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
-                  </tr>
-                <% }); %>
-              <% }%>
-            </table>
-          <% }); %>
-        </script>
-      </div>
+      <div id="menuContainer" style="overflow-y:auto;"></div>
     </div>
 
     <div class="col-sm-10 mainDiv">

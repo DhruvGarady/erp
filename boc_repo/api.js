@@ -5,19 +5,63 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const session = require("express-session");
 const jwt = require("jsonwebtoken");
+const path = require("path");
+const { logger, requestLogger, errorLogger } = require("./backend/logger");
 
 const app = express();
+const port = parseInt(process.env.PORT || "3000", 10);
+const dbConnectionLimit = parseInt(process.env.DB_CONNECTION_LIMIT || "30", 10);
+
 app.use(express.json());
-app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static(__dirname));
+
+const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5500,http://127.0.0.1:5500")
+    .split(",")
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error("CORS origin not allowed"));
+    },
+    credentials: true
+}));
+
+const staticOptions = {
+    dotfiles: "deny",
+    index: false,
+    fallthrough: true
+};
+
+app.use("/global", express.static(path.join(__dirname, "global"), staticOptions));
+app.use("/pages", express.static(path.join(__dirname, "pages"), staticOptions));
+app.use("/scripts", express.static(path.join(__dirname, "scripts"), staticOptions));
+
+["index.html", "activation-success.html", "activation-error.html", "password-reset.html"].forEach((fileName) => {
+    app.get(`/${fileName}`, (req, res) => {
+        res.sendFile(path.join(__dirname, fileName));
+    });
+});
+
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "index.html"));
+});
 
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
+    cookie: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production"
+    }
 }));
+
+app.use(requestLogger);
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -26,8 +70,12 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME,
     port: process.env.DB_PORT,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: dbConnectionLimit,
     queueLimit: 0
+});
+
+pool.on("connection", () => {
+    logger.debug("MySQL pool opened a new connection");
 });
 
 // ---------------- JWT MIDDLEWARE ----------------
@@ -56,11 +104,47 @@ function verifyToken(req, res, next) {
     });
 }
 
-require("./backend/global_api")({ app, pool, verifyToken });
-require("./backend/masterdata_api")({ app, pool, verifyToken });
-require("./backend/sales_api")({ app, pool, verifyToken });
-require("./backend/inventory_api")({ app, pool, verifyToken });
+function normalizeRoleName(roleName) {
+    return String(roleName || "").trim().toUpperCase();
+}
 
-app.listen(3000, () => {
-    console.log("Server running on port 3000");
+function userHasRole(req, allowedRoles) {
+    const userRole = normalizeRoleName(req.user && req.user.role_name);
+    const roles = (allowedRoles || []).map(normalizeRoleName);
+
+    if (!roles.length) {
+        return true;
+    }
+
+    if (roles.includes("AUTHENTICATED")) {
+        return true;
+    }
+
+    return roles.some((role) => userRole === role || userRole.indexOf(role) !== -1);
+}
+
+function requireRole(allowedRoles) {
+    return (req, res, next) => {
+        if (userHasRole(req, allowedRoles)) {
+            return next();
+        }
+
+        return res.status(403).json({ error: "Access denied. Insufficient role permission" });
+    };
+}
+
+const authTools = { verifyToken, requireRole, userHasRole };
+
+require("./backend/global_api")({ app, pool, ...authTools });
+require("./backend/masterdata_api")({ app, pool, ...authTools });
+require("./backend/sales_api")({ app, pool, ...authTools });
+require("./backend/inventory_api")({ app, pool, ...authTools });
+
+app.use(errorLogger);
+
+app.listen(port, () => {
+    logger.info("Server running", {
+        port,
+        dbConnectionLimit
+    });
 });

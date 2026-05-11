@@ -1,4 +1,4 @@
-module.exports = function registerMasterdataApi({ app, pool, verifyToken }) {
+module.exports = function registerMasterdataApi({ app, pool, verifyToken, userHasRole, requireRole }) {
 //-------------------------------------MASTER DATA TABLES---------------------------------------------
 
 // ============================================================
@@ -16,17 +16,47 @@ function now() {
     return new Date().toISOString().slice(0, 19).replace("T", " ");
 }
 
+const AUDIT_FIELDS = ["created_by", "updated_by", "created_at", "updated_at", "is_active"];
+const MASTER_ADMIN_ROLES = ["ADMIN"];
+const MASTER_OPERATIONAL_ROLES = ["ADMIN", "MANAGER"];
+const MASTER_FINANCE_ROLES = ["ADMIN", "FINANCE"];
+
+function withAuditFields(fields) {
+    return Array.from(new Set([...(fields || []), ...AUDIT_FIELDS]));
+}
+
 const MASTER_TABLE_CONFIG = {
     mst_customer: {
         pk: "customer_id",
-        searchable: ["customer_code", "customer_name", "contact_person", "email", "phone", "gst_no", "city", "state", "country"]
+        fields: withAuditFields(["customer_code", "customer_name", "customer_type", "contact_person", "email", "phone", "alt_phone", "gst_no", "pan_no", "billing_address", "shipping_address", "city", "state", "country", "pincode", "credit_days", "credit_limit", "remarks"]),
+        required: ["customer_code", "customer_name"],
+        unique: ["customer_code"],
+        numeric: ["credit_days", "credit_limit"],
+        searchable: ["customer_code", "customer_name", "contact_person", "email", "phone", "gst_no", "city", "state", "country"],
+        writeRoles: MASTER_OPERATIONAL_ROLES,
+        deactivateReferences: [
+            { table: "quotations", column: "customer_id", condition: "is_active = 'Y'" },
+            { table: "sales_orders", column: "customer_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_vendor: {
         pk: "vendor_id",
-        searchable: ["vendor_code", "vendor_name", "contact_person", "email", "phone", "gst_no", "city", "state", "country"]
+        fields: withAuditFields(["vendor_code", "vendor_name", "vendor_type", "contact_person", "email", "phone", "alt_phone", "gst_no", "pan_no", "billing_address", "shipping_address", "city", "state", "country", "pincode", "payment_term", "remarks"]),
+        required: ["vendor_code", "vendor_name"],
+        unique: ["vendor_code"],
+        numeric: [],
+        searchable: ["vendor_code", "vendor_name", "contact_person", "email", "phone", "gst_no", "city", "state", "country"],
+        writeRoles: MASTER_OPERATIONAL_ROLES,
+        deactivateReferences: [
+            { table: "goods_receipts", column: "vendor_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_material: {
         pk: "material_id",
+        fields: withAuditFields(["material_code", "material_name", "material_type", "material_group_id", "base_uom_id", "purchase_uom_id", "sales_uom_id", "currency_id", "tax_id", "hsn_sac_code", "standard_rate", "sales_rate", "min_sale_qty", "max_sale_qty", "discount_allowed", "default_discount_percent", "tax_classification", "gst_applicable", "is_tax_inclusive", "cess_percent", "preferred_vendor_id", "lead_time_days", "moq", "procurement_type", "reorder_level", "min_stock", "max_stock", "safety_stock", "storage_condition", "shelf_life_days", "default_warehouse_id", "costing_method", "weight", "length", "width", "height", "dimension_uom", "brand", "model_no", "material_description"]),
+        required: ["material_code", "material_name", "material_group_id", "base_uom_id"],
+        unique: ["material_code"],
+        numeric: ["material_group_id", "base_uom_id", "purchase_uom_id", "sales_uom_id", "currency_id", "tax_id", "standard_rate", "sales_rate", "min_sale_qty", "max_sale_qty", "default_discount_percent", "cess_percent", "preferred_vendor_id", "lead_time_days", "moq", "reorder_level", "min_stock", "max_stock", "safety_stock", "shelf_life_days", "default_warehouse_id", "weight", "length", "width", "height"],
         searchable: [
             "material_code",
             "material_name",
@@ -41,48 +71,290 @@ const MASTER_TABLE_CONFIG = {
             "storage_condition",
             "costing_method",
             "dimension_uom"
+        ],
+        writeRoles: MASTER_OPERATIONAL_ROLES,
+        deactivateReferences: [
+            { table: "mst_bom", column: "parent_material_id", condition: "is_active = 'Y'" },
+            { table: "mst_bom_items", column: "child_material_id", condition: "is_active = 'Y'" },
+            { table: "quotation_items", column: "material_id", condition: "is_active = 'Y'" },
+            { table: "sales_order_items", column: "material_id", condition: "is_active = 'Y'" },
+            { table: "inventory_summary", column: "material_id", condition: "is_active = 'Y' AND (COALESCE(on_hand_qty, 0) <> 0 OR COALESCE(reserved_qty, 0) <> 0)" }
         ]
     },
     mst_currency: {
         pk: "currency_id",
-        searchable: ["currency_code", "currency_name", "currency_symbol", "description"]
+        fields: withAuditFields(["currency_code", "currency_name", "currency_symbol", "description"]),
+        required: ["currency_code", "currency_name"],
+        unique: ["currency_code"],
+        numeric: [],
+        searchable: ["currency_code", "currency_name", "currency_symbol", "description"],
+        writeRoles: MASTER_FINANCE_ROLES,
+        deactivateReferences: [
+            { table: "mst_material", column: "currency_id", condition: "is_active = 'Y'" },
+            { table: "quotations", column: "currency_id", condition: "is_active = 'Y'" },
+            { table: "sales_orders", column: "currency_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_uom: {
         pk: "uom_id",
-        searchable: ["uom_code", "uom_name", "description"]
+        fields: withAuditFields(["uom_code", "uom_name", "description"]),
+        required: ["uom_code", "uom_name"],
+        unique: ["uom_code"],
+        searchable: ["uom_code", "uom_name", "description"],
+        writeRoles: MASTER_OPERATIONAL_ROLES,
+        deactivateReferences: [
+            { table: "mst_material", column: "base_uom_id", condition: "is_active = 'Y'" },
+            { table: "mst_material", column: "purchase_uom_id", condition: "is_active = 'Y'" },
+            { table: "mst_material", column: "sales_uom_id", condition: "is_active = 'Y'" },
+            { table: "mst_bom_items", column: "uom_id", condition: "is_active = 'Y'" },
+            { table: "sales_order_items", column: "uom_id", condition: "is_active = 'Y'" },
+            { table: "inventory_summary", column: "uom_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_tax: {
         pk: "tax_id",
-        searchable: ["tax_code", "tax_name", "tax_type", "description"]
+        fields: withAuditFields(["tax_code", "tax_name", "tax_percent", "tax_type", "description"]),
+        required: ["tax_code", "tax_name"],
+        unique: ["tax_code"],
+        numeric: ["tax_percent"],
+        searchable: ["tax_code", "tax_name", "tax_type", "description"],
+        writeRoles: MASTER_FINANCE_ROLES,
+        deactivateReferences: [
+            { table: "mst_material", column: "tax_id", condition: "is_active = 'Y'" },
+            { table: "quotation_items", column: "tax_id", condition: "is_active = 'Y'" },
+            { table: "sales_order_items", column: "tax_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_payment_terms: {
         pk: "payment_term_id",
-        searchable: ["payment_term_code", "payment_term_name", "description"]
+        fields: withAuditFields(["payment_term_code", "payment_term_name", "no_of_days", "description"]),
+        required: ["payment_term_code", "payment_term_name"],
+        unique: ["payment_term_code"],
+        numeric: ["no_of_days"],
+        searchable: ["payment_term_code", "payment_term_name", "description"],
+        writeRoles: MASTER_FINANCE_ROLES,
+        deactivateReferences: [
+            { table: "quotations", column: "payment_term_id", condition: "is_active = 'Y'" },
+            { table: "sales_orders", column: "payment_term_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_material_group: {
         pk: "material_group_id",
-        searchable: ["material_group_code", "material_group_name", "description"]
+        fields: withAuditFields(["material_group_code", "material_group_name", "description"]),
+        required: ["material_group_code", "material_group_name"],
+        unique: ["material_group_code"],
+        searchable: ["material_group_code", "material_group_name", "description"],
+        writeRoles: MASTER_OPERATIONAL_ROLES,
+        deactivateReferences: [
+            { table: "mst_material", column: "material_group_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_bom: {
         pk: "bom_id",
-        searchable: ["bom_code", "bom_name", "version_no", "material_category", "parent_material_name", "remarks"]
+        fields: withAuditFields(["bom_code", "bom_name", "material_category_id", "material_category", "parent_material_id", "parent_material_name", "version_no", "remarks"]),
+        required: ["bom_code", "bom_name", "parent_material_id"],
+        unique: ["bom_code"],
+        numeric: ["material_category_id", "parent_material_id"],
+        searchable: ["bom_code", "bom_name", "version_no", "material_category", "parent_material_name", "remarks"],
+        writeRoles: MASTER_OPERATIONAL_ROLES
     },
     mst_warehouse: {
         pk: "warehouse_id",
-        searchable: ["warehouse_code", "warehouse_name", "warehouse_type", "contact_person", "email", "phone", "city", "state", "country"]
+        fields: withAuditFields(["warehouse_code", "warehouse_name", "warehouse_type", "contact_person", "phone", "email", "address_line1", "address_line2", "city", "state", "country", "pincode", "remarks"]),
+        required: ["warehouse_code", "warehouse_name"],
+        unique: ["warehouse_code"],
+        searchable: ["warehouse_code", "warehouse_name", "warehouse_type", "contact_person", "email", "phone", "city", "state", "country"],
+        writeRoles: MASTER_OPERATIONAL_ROLES,
+        deactivateReferences: [
+            { table: "inventory_summary", column: "warehouse_id", condition: "is_active = 'Y' AND (COALESCE(on_hand_qty, 0) <> 0 OR COALESCE(reserved_qty, 0) <> 0)" },
+            { table: "goods_receipts", column: "warehouse_id", condition: "is_active = 'Y'" },
+            { table: "sales_orders", column: "warehouse_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_gl_account: {
         pk: "gl_account_id",
-        searchable: ["gl_account_code", "gl_account_name", "account_type", "account_group", "description"]
+        fields: withAuditFields(["gl_account_code", "gl_account_name", "account_type", "account_group", "description"]),
+        required: ["gl_account_code", "gl_account_name", "account_type"],
+        unique: ["gl_account_code"],
+        searchable: ["gl_account_code", "gl_account_name", "account_type", "account_group", "description"],
+        writeRoles: MASTER_FINANCE_ROLES,
+        deactivateReferences: [
+            { table: "trn_journal_entry", column: "gl_account_id", condition: "is_active = 'Y'" }
+        ]
     },
     mst_bom_items: {
         pk: "bom_item_id",
-        searchable: ["material_category", "child_material_name", "part_code", "remarks"]
+        fields: withAuditFields(["bom_id", "line_no", "material_category_id", "material_category", "child_material_id", "child_material_name", "part_code", "quantity", "uom_id", "scrap_percent", "remarks"]),
+        required: ["bom_id", "child_material_id", "quantity"],
+        numeric: ["bom_id", "line_no", "material_category_id", "child_material_id", "quantity", "uom_id", "scrap_percent"],
+        searchable: ["material_category", "child_material_name", "part_code", "remarks"],
+        writeRoles: MASTER_OPERATIONAL_ROLES
     }
 };
 
 function getTableConfig(tableName) {
     return MASTER_TABLE_CONFIG[tableName] || null;
+}
+
+function isBlank(value) {
+    return value === undefined || value === null || String(value).trim() === "";
+}
+
+function isValidActiveFlag(value) {
+    return value === undefined || value === null || value === "" || ["Y", "N"].includes(String(value).toUpperCase());
+}
+
+function ensureMasterWriteAccess(req, config, res) {
+    if (userHasRole && userHasRole(req, config.writeRoles || MASTER_ADMIN_ROLES)) {
+        return true;
+    }
+
+    res.status(403).json({ error: "Access denied. You do not have permission to modify this master data." });
+    return false;
+}
+
+function buildColumnList(config) {
+    return [config.pk, ...(config.fields || [])].join(", ");
+}
+
+function sanitizeMasterPayload(config, body, isCreate) {
+    const source = body || {};
+    const allowed = new Set(config.fields || []);
+    const payload = {};
+    const unknownFields = [];
+
+    Object.keys(source).forEach((key) => {
+        if (key === config.pk) {
+            return;
+        }
+
+        if (!allowed.has(key)) {
+            unknownFields.push(key);
+            return;
+        }
+
+        payload[key] = source[key];
+    });
+
+    if (unknownFields.length) {
+        return { error: `Unsupported field(s): ${unknownFields.join(", ")}` };
+    }
+
+    const dateNow = now();
+    if (isCreate) {
+        payload.created_at = payload.created_at || dateNow;
+        payload.created_by = payload.created_by || null;
+    }
+
+    payload.updated_at = payload.updated_at || dateNow;
+    payload.updated_by = payload.updated_by || payload.created_by || null;
+    if (isCreate) {
+        payload.is_active = payload.is_active || "Y";
+    }
+
+    return { payload };
+}
+
+function validateMasterPayload(config, payload, isCreate) {
+    const required = config.required || [];
+
+    for (const field of required) {
+        if (isCreate && isBlank(payload[field])) {
+            return `${field} is required`;
+        }
+
+        if (!isCreate && Object.prototype.hasOwnProperty.call(payload, field) && isBlank(payload[field])) {
+            return `${field} cannot be blank`;
+        }
+    }
+
+    if (!isValidActiveFlag(payload.is_active)) {
+        return "is_active must be Y or N";
+    }
+
+    for (const field of (config.numeric || [])) {
+        if (!isBlank(payload[field]) && Number.isNaN(Number(payload[field]))) {
+            return `${field} must be numeric`;
+        }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "tax_percent")) {
+        const taxPercent = Number(payload.tax_percent);
+        if (!Number.isNaN(taxPercent) && (taxPercent < 0 || taxPercent > 100)) {
+            return "tax_percent must be between 0 and 100";
+        }
+    }
+
+    return null;
+}
+
+function runUniqueChecks(tableName, config, payload, recordId, callback) {
+    const uniqueFields = (config.unique || []).filter(field => !isBlank(payload[field]));
+    let index = 0;
+
+    function next() {
+        if (index >= uniqueFields.length) {
+            return callback();
+        }
+
+        const field = uniqueFields[index++];
+        const values = [payload[field]];
+        let sql = `SELECT ${config.pk} FROM ${tableName} WHERE ${field} = ? AND COALESCE(is_active, 'Y') = 'Y'`;
+
+        if (recordId) {
+            sql += ` AND ${config.pk} <> ?`;
+            values.push(recordId);
+        }
+
+        sql += " LIMIT 1";
+
+        pool.query(sql, values, (err, rows) => {
+            if (err) {
+                return callback(err);
+            }
+
+            if (rows.length) {
+                const duplicateErr = new Error(`${field} already exists`);
+                duplicateErr.statusCode = 400;
+                return callback(duplicateErr);
+            }
+
+            next();
+        });
+    }
+
+    next();
+}
+
+function checkDeactivateDependencies(config, recordId, callback) {
+    const references = config.deactivateReferences || [];
+    let index = 0;
+
+    function next() {
+        if (index >= references.length) {
+            return callback();
+        }
+
+        const ref = references[index++];
+        const condition = ref.condition ? ` AND ${ref.condition}` : "";
+        const sql = `SELECT 1 FROM ${ref.table} WHERE ${ref.column} = ?${condition} LIMIT 1`;
+
+        pool.query(sql, [recordId], (err, rows) => {
+            if (err) {
+                return callback(err);
+            }
+
+            if (rows.length) {
+                const dependencyErr = new Error(`Cannot deactivate this record because it is used in ${ref.table}`);
+                dependencyErr.statusCode = 409;
+                return callback(dependencyErr);
+            }
+
+            next();
+        });
+    }
+
+    next();
 }
 
 function buildWhereClause(tableName, query) {
@@ -123,7 +395,7 @@ app.get("/api/v1/:table", verifyToken, (req, res) => {
     const { whereClause, values } = buildWhereClause(tableName, req.query);
 
     const countSql = `SELECT COUNT(*) AS total FROM ${tableName} ${whereClause}`;
-    const dataSql = `SELECT * FROM ${tableName} ${whereClause} ORDER BY ${config.pk} DESC LIMIT ? OFFSET ?`;
+    const dataSql = `SELECT ${buildColumnList(config)} FROM ${tableName} ${whereClause} ORDER BY ${config.pk} DESC LIMIT ? OFFSET ?`;
 
     pool.query(countSql, values, (countErr, countRows) => {
         if (countErr) {
@@ -159,7 +431,7 @@ app.get("/api/v1/:table/:id", verifyToken, (req, res) => {
         return res.status(400).json({ error: "Invalid table name" });
     }
 
-    const sql = `SELECT * FROM ${tableName} WHERE ${config.pk} = ? LIMIT 1`;
+    const sql = `SELECT ${buildColumnList(config)} FROM ${tableName} WHERE ${config.pk} = ? LIMIT 1`;
 
     pool.query(sql, [recordId], (err, rows) => {
         if (err) {
@@ -186,15 +458,26 @@ app.post("/api/v1/:table", verifyToken, (req, res) => {
         return res.status(400).json({ error: "Invalid table name" });
     }
 
-    const payload = { ...req.body };
+    if (!ensureMasterWriteAccess(req, config, res)) {
+        return;
+    }
 
-    if (!payload.created_at) payload.created_at = now();
-    if (!payload.updated_at) payload.updated_at = now();
-    if (!payload.created_by && req.user && req.user.username) payload.created_by = req.user.username;
-    if (!payload.updated_by && req.user && req.user.username) payload.updated_by = req.user.username;
+    const sanitized = sanitizeMasterPayload(config, req.body, true);
+    if (sanitized.error) {
+        return res.status(400).json({ error: sanitized.error });
+    }
 
-    const columns = Object.keys(payload);
-    const values = Object.values(payload);
+    const payload = sanitized.payload;
+    payload.created_by = payload.created_by || (req.user && (req.user.user_id || req.user.username)) || null;
+    payload.updated_by = payload.updated_by || payload.created_by;
+
+    const validationError = validateMasterPayload(config, payload, true);
+    if (validationError) {
+        return res.status(400).json({ error: validationError });
+    }
+
+    const columns = Object.keys(payload).filter(col => (config.fields || []).includes(col));
+    const values = columns.map(col => payload[col]);
 
     if (columns.length === 0) {
         return res.status(400).json({ error: "Request body cannot be empty" });
@@ -203,16 +486,23 @@ app.post("/api/v1/:table", verifyToken, (req, res) => {
     const placeholders = columns.map(() => "?").join(", ");
     const sql = `INSERT INTO ${tableName} (${columns.join(", ")}) VALUES (${placeholders})`;
 
-    pool.query(sql, values, (err, result) => {
-        if (err) {
-            console.error(`POST /api/v1/${tableName} error:`, err);
-            return res.status(500).json({ error: "Failed to create record" });
+    runUniqueChecks(tableName, config, payload, null, (uniqueErr) => {
+        if (uniqueErr) {
+            console.error(`POST /api/v1/${tableName} unique check error:`, uniqueErr);
+            return res.status(uniqueErr.statusCode || 500).json({ error: uniqueErr.message || "Failed to validate record" });
         }
 
-        res.json({
-            success: true,
-            message: "Record created successfully",
-            id: result.insertId
+        pool.query(sql, values, (err, result) => {
+            if (err) {
+                console.error(`POST /api/v1/${tableName} error:`, err);
+                return res.status(500).json({ error: "Failed to create record" });
+            }
+
+            res.json({
+                success: true,
+                message: "Record created successfully",
+                id: result.insertId
+            });
         });
     });
 });
@@ -229,14 +519,25 @@ app.put("/api/v1/:table/:id", verifyToken, (req, res) => {
         return res.status(400).json({ error: "Invalid table name" });
     }
 
-    const payload = { ...req.body };
-    delete payload[config.pk];
+    if (!ensureMasterWriteAccess(req, config, res)) {
+        return;
+    }
 
-    payload.updated_at = payload.updated_at || now();
-    if (!payload.updated_by && req.user && req.user.username) payload.updated_by = req.user.username;
+    const sanitized = sanitizeMasterPayload(config, req.body, false);
+    if (sanitized.error) {
+        return res.status(400).json({ error: sanitized.error });
+    }
 
-    const columns = Object.keys(payload);
-    const values = Object.values(payload);
+    const payload = sanitized.payload;
+    payload.updated_by = payload.updated_by || (req.user && (req.user.user_id || req.user.username)) || null;
+
+    const validationError = validateMasterPayload(config, payload, false);
+    if (validationError) {
+        return res.status(400).json({ error: validationError });
+    }
+
+    const columns = Object.keys(payload).filter(col => (config.fields || []).includes(col) && !["created_by", "created_at"].includes(col));
+    const values = columns.map(col => payload[col]);
 
     if (columns.length === 0) {
         return res.status(400).json({ error: "Request body cannot be empty" });
@@ -245,19 +546,26 @@ app.put("/api/v1/:table/:id", verifyToken, (req, res) => {
     const setClause = columns.map(col => `${col} = ?`).join(", ");
     const sql = `UPDATE ${tableName} SET ${setClause} WHERE ${config.pk} = ?`;
 
-    pool.query(sql, [...values, recordId], (err, result) => {
-        if (err) {
-            console.error(`PUT /api/v1/${tableName}/:id error:`, err);
-            return res.status(500).json({ error: "Failed to update record" });
+    runUniqueChecks(tableName, config, payload, recordId, (uniqueErr) => {
+        if (uniqueErr) {
+            console.error(`PUT /api/v1/${tableName}/:id unique check error:`, uniqueErr);
+            return res.status(uniqueErr.statusCode || 500).json({ error: uniqueErr.message || "Failed to validate record" });
         }
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: "Record not found" });
-        }
+        pool.query(sql, [...values, recordId], (err, result) => {
+            if (err) {
+                console.error(`PUT /api/v1/${tableName}/:id error:`, err);
+                return res.status(500).json({ error: "Failed to update record" });
+            }
 
-        res.json({
-            success: true,
-            message: "Record updated successfully"
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Record not found" });
+            }
+
+            res.json({
+                success: true,
+                message: "Record updated successfully"
+            });
         });
     });
 });
@@ -274,6 +582,10 @@ app.delete("/api/v1/:table/:id", verifyToken, (req, res) => {
         return res.status(400).json({ error: "Invalid table name" });
     }
 
+    if (!ensureMasterWriteAccess(req, config, res)) {
+        return;
+    }
+
     const updatedBy = (req.body && req.body.updated_by) || (req.user && req.user.username) || null;
     const updatedAt = (req.body && req.body.updated_at) || now();
 
@@ -283,19 +595,26 @@ app.delete("/api/v1/:table/:id", verifyToken, (req, res) => {
         WHERE ${config.pk} = ?
     `;
 
-    pool.query(sql, ["N", updatedBy, updatedAt, recordId], (err, result) => {
-        if (err) {
-            console.error(`DELETE /api/v1/${tableName}/:id error:`, err);
-            return res.status(500).json({ error: "Failed to delete record" });
+    checkDeactivateDependencies(config, recordId, (dependencyErr) => {
+        if (dependencyErr) {
+            console.error(`DELETE /api/v1/${tableName}/:id dependency check error:`, dependencyErr);
+            return res.status(dependencyErr.statusCode || 500).json({ error: dependencyErr.message || "Failed to validate record dependencies" });
         }
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: "Record not found" });
-        }
+        pool.query(sql, ["N", updatedBy, updatedAt, recordId], (err, result) => {
+            if (err) {
+                console.error(`DELETE /api/v1/${tableName}/:id error:`, err);
+                return res.status(500).json({ error: "Failed to delete record" });
+            }
 
-        res.json({
-            success: true,
-            message: "Record deleted successfully"
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Record not found" });
+            }
+
+            res.json({
+                success: true,
+                message: "Record deleted successfully"
+            });
         });
     });
 });
@@ -345,7 +664,7 @@ app.get("/api/v1/journals/trial-balance", verifyToken, (req, res) => {
     });
 });
 
-app.post("/api/v1/journals", verifyToken, (req, res) => {
+app.post("/api/v1/journals", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
     const { header, entries } = req.body;
     const ts = now();
 
@@ -445,7 +764,7 @@ app.post("/api/v1/journals", verifyToken, (req, res) => {
     });
 });
 
-app.post("/api/v1/journals/:id/post", verifyToken, (req, res) => {
+app.post("/api/v1/journals/:id/post", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
     const journalHeaderId = req.params.id;
     const ts = now();
     const sql = `
@@ -460,7 +779,7 @@ app.post("/api/v1/journals/:id/post", verifyToken, (req, res) => {
     });
 });
 
-app.post("/api/v1/journals/:id/reverse", verifyToken, (req, res) => {
+app.post("/api/v1/journals/:id/reverse", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
     const journalHeaderId = req.params.id;
     const ts = now();
 
@@ -557,7 +876,7 @@ app.get("/api/v1/periods/current", verifyToken, (req, res) => {
     });
 });
 
-app.patch("/api/v1/periods/:id/close", verifyToken, (req, res) => {
+app.patch("/api/v1/periods/:id/close", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
     const periodId = req.params.id;
     const ts = now();
 
@@ -575,7 +894,7 @@ app.patch("/api/v1/periods/:id/close", verifyToken, (req, res) => {
     });
 });
 
-app.patch("/api/v1/periods/:id/reopen", verifyToken, (req, res) => {
+app.patch("/api/v1/periods/:id/reopen", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
     const periodId = req.params.id;
     const ts = now();
     const role = req.user?.role_name || '';

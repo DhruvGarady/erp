@@ -1,4 +1,4 @@
-module.exports = function registerSalesApi({ app, pool, verifyToken }) {
+module.exports = function registerSalesApi({ app, pool, verifyToken, requireRole }) {
 //----------------------------------------------------QUOTATION MODULE------------------------------------------------
 
 // ------------------------------------------------------------------
@@ -8,12 +8,145 @@ function now() {
     return new Date().toISOString().slice(0, 19).replace("T", " ");
 }
 
+const SALES_WRITE_ROLES = ["ADMIN", "MANAGER", "SALES"];
+
+const DOCUMENT_SEQUENCE_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS document_sequences (
+        sequence_name VARCHAR(50) PRIMARY KEY,
+        prefix VARCHAR(20) NOT NULL,
+        next_number INT NOT NULL,
+        padding INT NOT NULL DEFAULT 4,
+        updated_at DATETIME
+    )
+`;
+
+pool.query(DOCUMENT_SEQUENCE_TABLE_SQL, (err) => {
+    if (err) {
+        console.error("Unable to ensure document_sequences table:", err);
+    }
+});
+
+function clampListLimit(value) {
+    const parsed = parseInt(value || "200", 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 200;
+    return Math.min(parsed, 500);
+}
+
+function buildLikeFilter(whereParts, values, column, value) {
+    if (value === undefined || value === null || String(value).trim() === "" || String(value).toUpperCase() === "ALL") {
+        return;
+    }
+
+    whereParts.push(`${column} LIKE ?`);
+    values.push(`%${String(value).trim()}%`);
+}
+
+function buildExactFilter(whereParts, values, column, value) {
+    if (value === undefined || value === null || String(value).trim() === "" || String(value).toUpperCase() === "ALL") {
+        return;
+    }
+
+    whereParts.push(`${column} = ?`);
+    values.push(String(value).trim());
+}
+
+function getNextDocumentNumber(connection, sequenceName, prefix, callback) {
+    const selectSql = "SELECT next_number, padding FROM document_sequences WHERE sequence_name = ? FOR UPDATE";
+
+    connection.query(selectSql, [sequenceName], (selectErr, rows) => {
+        if (selectErr) return callback(selectErr);
+
+        if (!rows.length) {
+            const firstNumber = 1;
+            const insertSql = "INSERT INTO document_sequences (sequence_name, prefix, next_number, padding, updated_at) VALUES (?, ?, ?, ?, ?)";
+
+            return connection.query(insertSql, [sequenceName, prefix, firstNumber + 1, 4, now()], (insertErr) => {
+                if (insertErr) return callback(insertErr);
+                callback(null, `${prefix}-${String(firstNumber).padStart(4, "0")}`);
+            });
+        }
+
+        const currentNumber = Number(rows[0].next_number || 1);
+        const padding = Number(rows[0].padding || 4);
+        const updateSql = "UPDATE document_sequences SET next_number = ?, updated_at = ? WHERE sequence_name = ?";
+
+        connection.query(updateSql, [currentNumber + 1, now(), sequenceName], (updateErr) => {
+            if (updateErr) return callback(updateErr);
+            callback(null, `${prefix}-${String(currentNumber).padStart(padding, "0")}`);
+        });
+    });
+}
+
+function peekNextDocumentNumber(sequenceName, prefix, tableName, numberColumn, pkColumn, callback) {
+    const sequenceSql = "SELECT next_number, padding FROM document_sequences WHERE sequence_name = ? LIMIT 1";
+
+    pool.query(sequenceSql, [sequenceName], (seqErr, seqRows) => {
+        if (!seqErr && seqRows.length) {
+            const nextNumber = Number(seqRows[0].next_number || 1);
+            const padding = Number(seqRows[0].padding || 4);
+            return callback(null, `${prefix}-${String(nextNumber).padStart(padding, "0")}`);
+        }
+
+        const fallbackSql = `SELECT ${numberColumn} FROM ${tableName} ORDER BY ${pkColumn} DESC LIMIT 1`;
+        pool.query(fallbackSql, (err, rows) => {
+            if (err) return callback(err);
+
+            let nextNo = `${prefix}-0001`;
+            if (rows.length > 0 && rows[0][numberColumn]) {
+                const parts = String(rows[0][numberColumn]).split("-");
+                if (parts.length === 2) {
+                    const num = parseInt(parts[1], 10) + 1;
+                    nextNo = `${prefix}-${String(num).padStart(4, "0")}`;
+                }
+            }
+
+            callback(null, nextNo);
+        });
+    });
+}
+
 
 // ==================================================================
 // 1. GET /quotation/list
 //    Returns all active quotations (summary list)
 // ==================================================================
 app.get("/quotation/list", verifyToken, (req, res) => {
+    const values = [];
+    const whereParts = ["is_active = 'Y'"];
+    const limit = clampListLimit(req.query.limit);
+    const page = Math.max(parseInt(req.query.page || "1", 10) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    buildLikeFilter(whereParts, values, "quotation_no", req.query.quotation_no || req.query.quotationNo);
+    buildLikeFilter(whereParts, values, "customer_name", req.query.customer || req.query.customer_name);
+    buildExactFilter(whereParts, values, "status", req.query.status);
+    buildExactFilter(whereParts, values, "approval_status", req.query.approval_status);
+
+    if (req.query.from_date) {
+        whereParts.push("quotation_date >= ?");
+        values.push(req.query.from_date);
+    }
+
+    if (req.query.to_date) {
+        whereParts.push("quotation_date <= ?");
+        values.push(req.query.to_date);
+    }
+
+    if (req.query.search) {
+        whereParts.push("(quotation_no LIKE ? OR customer_name LIKE ? OR subject LIKE ? OR status LIKE ? OR approval_status LIKE ?)");
+        for (let i = 0; i < 5; i++) values.push(`%${String(req.query.search).trim()}%`);
+    }
+
+    const sortableColumns = {
+        quotation_date: "quotation_date",
+        quotation_no: "quotation_no",
+        customer_name: "customer_name",
+        grand_total: "grand_total",
+        status: "status"
+    };
+    const sortBy = sortableColumns[req.query.sort_by] || "quotation_id";
+    const sortDir = String(req.query.sort_dir || "DESC").toUpperCase() === "ASC" ? "ASC" : "DESC";
+
     const sql = `
         SELECT 
             quotation_id,
@@ -37,10 +170,11 @@ app.get("/quotation/list", verifyToken, (req, res) => {
             updated_at,
             is_active
         FROM quotations
-        WHERE is_active = 'Y'
-        ORDER BY quotation_id DESC
+        WHERE ${whereParts.join(" AND ")}
+        ORDER BY ${sortBy} ${sortDir}
+        LIMIT ? OFFSET ?
     `;
-    pool.query(sql, (err, rows) => {
+    pool.query(sql, [...values, limit, offset], (err, rows) => {
         if (err) {
             console.error("GET /quotation/list error:", err);
             return res.status(500).json({ error: "Failed to fetch quotations" });
@@ -269,12 +403,11 @@ function insertQuotationItems(connection, quotationId, items, dateNow, callback)
 //    Creates quotation header + items in a transaction
 //    Body: { header: {...}, items: [...] }
 // ==================================================================
-app.post("/quotation/create", verifyToken, (req, res) => {
+app.post("/quotation/create", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
     const { header, items } = req.body;
     const dateNow = now();
     const headerRow = buildQuotationHeader(header, dateNow, true);
     const headerSql = `INSERT INTO quotations (${QUOTATION_HEADER_COLUMNS.join(", ")}) VALUES (${QUOTATION_HEADER_COLUMNS.map(() => "?").join(", ")})`;
-    const headerValues = QUOTATION_HEADER_COLUMNS.map(col => headerRow[col]);
 
     pool.getConnection((connErr, connection) => {
         if (connErr) {
@@ -288,8 +421,19 @@ app.post("/quotation/create", verifyToken, (req, res) => {
                 return res.status(500).json({ error: "Transaction start failed" });
             }
 
-            // Insert header
-            connection.query(headerSql, headerValues, (err, headerResult) => {
+            getNextDocumentNumber(connection, "QUOTATION", "QT", (numberErr, quotationNo) => {
+                if (numberErr) {
+                    return connection.rollback(() => {
+                        connection.release();
+                        console.error("Generate quotation number error:", numberErr);
+                        res.status(500).json({ error: "Failed to generate quotation number" });
+                    });
+                }
+
+                headerRow.quotation_no = quotationNo;
+                const headerValues = QUOTATION_HEADER_COLUMNS.map(col => headerRow[col]);
+
+                connection.query(headerSql, headerValues, (err, headerResult) => {
                 if (err) {
                     return connection.rollback(() => {
                         connection.release();
@@ -312,9 +456,10 @@ app.post("/quotation/create", verifyToken, (req, res) => {
                     connection.commit((commitErr) => {
                         connection.release();
                         if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                        res.json({ success: true, quotation_id: quotationId });
+                        res.json({ success: true, quotation_id: quotationId, quotation_no: quotationNo });
                     });
                 });
+            });
             });
         });
     });
@@ -326,7 +471,7 @@ app.post("/quotation/create", verifyToken, (req, res) => {
 //    Updates header, soft-deletes old items, inserts fresh items
 //    Body: { header: {...}, items: [...] }
 // ==================================================================
-app.put("/quotation/update/:id", verifyToken, (req, res) => {
+app.put("/quotation/update/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
     const quotationId = req.params.id;
     const { header, items } = req.body;
     const dateNow = now();
@@ -394,7 +539,7 @@ app.put("/quotation/update/:id", verifyToken, (req, res) => {
 //    Updates only the status field (Draft > Sent > Approved/Rejected)
 //    Body: { status: "Sent", updated_by: 1 }
 // ==================================================================
-app.patch("/quotation/status/:id", verifyToken, (req, res) => {
+app.patch("/quotation/status/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
     const quotationId = req.params.id;
     const { status, approval_status, reason, updated_by } = req.body || {};
     const dateNow = now();
@@ -435,7 +580,7 @@ app.patch("/quotation/status/:id", verifyToken, (req, res) => {
 //    Soft delete â€” sets is_active = 'N' on header (items stay)
 //    Body: { updated_by: 1 }
 // ==================================================================
-app.delete("/quotation/:id", verifyToken, (req, res) => {
+app.delete("/quotation/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
     const quotationId = req.params.id;
     const { updated_by } = req.body;
     const dateNow = now();
@@ -464,23 +609,10 @@ app.delete("/quotation/:id", verifyToken, (req, res) => {
 //    Returns the next quotation number e.g. QT-0001
 // ==================================================================
 app.get("/quotation/nextno", verifyToken, (req, res) => {
-    const sql = `SELECT quotation_no FROM quotations ORDER BY quotation_id DESC LIMIT 1`;
-
-    pool.query(sql, (err, rows) => {
+    peekNextDocumentNumber("QUOTATION", "QT", "quotations", "quotation_no", "quotation_id", (err, nextNo) => {
         if (err) {
             console.error("GET /quotation/nextno error:", err);
             return res.status(500).json({ error: "Failed to get next quotation number" });
-        }
-
-        let nextNo = "QT-0001";
-
-        if (rows.length > 0) {
-            const lastNo = rows[0].quotation_no; // e.g. QT-0042
-            const parts  = lastNo.split("-");
-            if (parts.length === 2) {
-                const num = parseInt(parts[1], 10) + 1;
-                nextNo = "QT-" + String(num).padStart(4, "0");
-            }
         }
 
         res.json({ quotation_no: nextNo });
@@ -1016,6 +1148,43 @@ function handleSalesOrderReservationError(connection, err, fallbackMessage, res)
 // GET /salesorder/list
 // ==================================================================
 app.get("/salesorder/list", verifyToken, (req, res) => {
+    const values = [];
+    const whereParts = ["is_active = 'Y'"];
+    const limit = clampListLimit(req.query.limit);
+    const page = Math.max(parseInt(req.query.page || "1", 10) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    buildLikeFilter(whereParts, values, "sales_order_no", req.query.sales_order_no || req.query.salesOrderNo);
+    buildLikeFilter(whereParts, values, "quotation_no", req.query.quotation_no || req.query.quotationNo);
+    buildLikeFilter(whereParts, values, "customer_name", req.query.customer || req.query.customer_name);
+    buildExactFilter(whereParts, values, "status", req.query.status);
+    buildExactFilter(whereParts, values, "approval_status", req.query.approval_status);
+
+    if (req.query.from_date) {
+        whereParts.push("sales_order_date >= ?");
+        values.push(req.query.from_date);
+    }
+
+    if (req.query.to_date) {
+        whereParts.push("sales_order_date <= ?");
+        values.push(req.query.to_date);
+    }
+
+    if (req.query.search) {
+        whereParts.push("(sales_order_no LIKE ? OR quotation_no LIKE ? OR customer_name LIKE ? OR subject LIKE ? OR status LIKE ?)");
+        for (let i = 0; i < 5; i++) values.push(`%${String(req.query.search).trim()}%`);
+    }
+
+    const sortableColumns = {
+        sales_order_date: "sales_order_date",
+        sales_order_no: "sales_order_no",
+        customer_name: "customer_name",
+        grand_total: "grand_total",
+        status: "status"
+    };
+    const sortBy = sortableColumns[req.query.sort_by] || "sales_order_id";
+    const sortDir = String(req.query.sort_dir || "DESC").toUpperCase() === "ASC" ? "ASC" : "DESC";
+
     const sql = `
         SELECT
             sales_order_id,
@@ -1036,11 +1205,12 @@ app.get("/salesorder/list", verifyToken, (req, res) => {
             updated_at,
             is_active
         FROM sales_orders
-        WHERE is_active = 'Y'
-        ORDER BY sales_order_id DESC
+        WHERE ${whereParts.join(" AND ")}
+        ORDER BY ${sortBy} ${sortDir}
+        LIMIT ? OFFSET ?
     `;
 
-    pool.query(sql, (err, rows) => {
+    pool.query(sql, [...values, limit, offset], (err, rows) => {
         if (err) {
             console.error("GET /salesorder/list error:", err);
             return res.status(500).json({ error: "Failed to fetch sales orders" });
@@ -1053,22 +1223,10 @@ app.get("/salesorder/list", verifyToken, (req, res) => {
 // GET /salesorder/nextno
 // ==================================================================
 app.get("/salesorder/nextno", verifyToken, (req, res) => {
-    const sql = `SELECT sales_order_no FROM sales_orders ORDER BY sales_order_id DESC LIMIT 1`;
-
-    pool.query(sql, (err, rows) => {
+    peekNextDocumentNumber("SALES_ORDER", "SO", "sales_orders", "sales_order_no", "sales_order_id", (err, nextNo) => {
         if (err) {
             console.error("GET /salesorder/nextno error:", err);
             return res.status(500).json({ error: "Failed to get next sales order number" });
-        }
-
-        let nextNo = "SO-0001";
-
-        if (rows.length > 0 && rows[0].sales_order_no) {
-            const parts = rows[0].sales_order_no.split("-");
-            if (parts.length === 2) {
-                const num = parseInt(parts[1], 10) + 1;
-                nextNo = "SO-" + String(num).padStart(4, "0");
-            }
         }
 
         res.json({ sales_order_no: nextNo });
@@ -1109,12 +1267,11 @@ app.get("/salesorder/:id", verifyToken, (req, res) => {
 // ==================================================================
 // POST /salesorder/create
 // ==================================================================
-app.post("/salesorder/create", verifyToken, (req, res) => {
+app.post("/salesorder/create", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
     const { header, items } = req.body;
     const dateNow = now();
     const headerRow = buildSalesOrderHeader(header, dateNow, true);
     const headerSql = `INSERT INTO sales_orders (${SALES_ORDER_HEADER_COLUMNS.join(", ")}) VALUES (${SALES_ORDER_HEADER_COLUMNS.map(() => "?").join(", ")})`;
-    const headerValues = SALES_ORDER_HEADER_COLUMNS.map(col => headerRow[col]);
 
     pool.getConnection((connErr, connection) => {
         if (connErr) {
@@ -1128,7 +1285,19 @@ app.post("/salesorder/create", verifyToken, (req, res) => {
                 return res.status(500).json({ error: "Transaction start failed" });
             }
 
-            connection.query(headerSql, headerValues, (err, headerResult) => {
+            getNextDocumentNumber(connection, "SALES_ORDER", "SO", (numberErr, salesOrderNo) => {
+                if (numberErr) {
+                    return connection.rollback(() => {
+                        connection.release();
+                        console.error("Generate sales order number error:", numberErr);
+                        res.status(500).json({ error: "Failed to generate sales order number" });
+                    });
+                }
+
+                headerRow.sales_order_no = salesOrderNo;
+                const headerValues = SALES_ORDER_HEADER_COLUMNS.map(col => headerRow[col]);
+
+                connection.query(headerSql, headerValues, (err, headerResult) => {
                 if (err) {
                     return connection.rollback(() => {
                         connection.release();
@@ -1156,10 +1325,11 @@ app.post("/salesorder/create", verifyToken, (req, res) => {
                         connection.commit((commitErr) => {
                             connection.release();
                             if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                            res.json({ success: true, sales_order_id: salesOrderId });
+                            res.json({ success: true, sales_order_id: salesOrderId, sales_order_no: salesOrderNo });
                         });
                     });
                 });
+            });
             });
         });
     });
@@ -1168,7 +1338,7 @@ app.post("/salesorder/create", verifyToken, (req, res) => {
 // ==================================================================
 // PUT /salesorder/update/:id
 // ==================================================================
-app.put("/salesorder/update/:id", verifyToken, (req, res) => {
+app.put("/salesorder/update/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
     const salesOrderId = req.params.id;
     const { header, items } = req.body;
     const dateNow = now();
@@ -1247,7 +1417,7 @@ app.put("/salesorder/update/:id", verifyToken, (req, res) => {
 // ==================================================================
 // PATCH /salesorder/status/:id
 // ==================================================================
-app.patch("/salesorder/status/:id", verifyToken, (req, res) => {
+app.patch("/salesorder/status/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
     const salesOrderId = req.params.id;
     const dateNow = now();
     const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;
@@ -1325,7 +1495,7 @@ app.patch("/salesorder/status/:id", verifyToken, (req, res) => {
 // ==================================================================
 // DELETE /salesorder/:id
 // ==================================================================
-app.delete("/salesorder/:id", verifyToken, (req, res) => {
+app.delete("/salesorder/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
     const salesOrderId = req.params.id;
     const dateNow = now();
     const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;

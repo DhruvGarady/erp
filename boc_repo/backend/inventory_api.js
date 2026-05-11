@@ -1,9 +1,88 @@
-module.exports = function registerInventoryApi({ app, pool, verifyToken }) {
+module.exports = function registerInventoryApi({ app, pool, verifyToken, requireRole }) {
 function now() {
     return new Date().toISOString().slice(0, 19).replace("T", " ");
 }
 
 //----------------------------------------------------INVENTORY / STOCK MODULE------------------------------------------------
+
+const INVENTORY_WRITE_ROLES = ["ADMIN", "MANAGER", "INVENTORY"];
+
+const DOCUMENT_SEQUENCE_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS document_sequences (
+        sequence_name VARCHAR(50) PRIMARY KEY,
+        prefix VARCHAR(20) NOT NULL,
+        next_number INT NOT NULL,
+        padding INT NOT NULL DEFAULT 4,
+        updated_at DATETIME
+    )
+`;
+
+pool.query(DOCUMENT_SEQUENCE_TABLE_SQL, (err) => {
+    if (err) {
+        console.error("Unable to ensure document_sequences table:", err);
+    }
+});
+
+function clampListLimit(value) {
+    const parsed = parseInt(value || "200", 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 200;
+    return Math.min(parsed, 500);
+}
+
+function getNextDocumentNumber(connection, sequenceName, prefix, callback) {
+    const selectSql = "SELECT next_number, padding FROM document_sequences WHERE sequence_name = ? FOR UPDATE";
+
+    connection.query(selectSql, [sequenceName], (selectErr, rows) => {
+        if (selectErr) return callback(selectErr);
+
+        if (!rows.length) {
+            const firstNumber = 1;
+            const insertSql = "INSERT INTO document_sequences (sequence_name, prefix, next_number, padding, updated_at) VALUES (?, ?, ?, ?, ?)";
+
+            return connection.query(insertSql, [sequenceName, prefix, firstNumber + 1, 4, now()], (insertErr) => {
+                if (insertErr) return callback(insertErr);
+                callback(null, `${prefix}-${String(firstNumber).padStart(4, "0")}`);
+            });
+        }
+
+        const currentNumber = Number(rows[0].next_number || 1);
+        const padding = Number(rows[0].padding || 4);
+        const updateSql = "UPDATE document_sequences SET next_number = ?, updated_at = ? WHERE sequence_name = ?";
+
+        connection.query(updateSql, [currentNumber + 1, now(), sequenceName], (updateErr) => {
+            if (updateErr) return callback(updateErr);
+            callback(null, `${prefix}-${String(currentNumber).padStart(padding, "0")}`);
+        });
+    });
+}
+
+function peekNextDocumentNumber(sequenceName, prefix, tableName, numberColumn, pkColumn, callback) {
+    const sequenceSql = "SELECT next_number, padding FROM document_sequences WHERE sequence_name = ? LIMIT 1";
+
+    pool.query(sequenceSql, [sequenceName], (seqErr, seqRows) => {
+        if (!seqErr && seqRows.length) {
+            const nextNumber = Number(seqRows[0].next_number || 1);
+            const padding = Number(seqRows[0].padding || 4);
+            return callback(null, `${prefix}-${String(nextNumber).padStart(padding, "0")}`);
+        }
+
+        const fallbackSql = `SELECT ${numberColumn} FROM ${tableName} ORDER BY ${pkColumn} DESC LIMIT 1`;
+        pool.query(fallbackSql, (err, rows) => {
+            if (err) return callback(err);
+
+            let nextNo = `${prefix}-0001`;
+            if (rows.length > 0 && rows[0][numberColumn]) {
+                const parts = String(rows[0][numberColumn]).split("-");
+                if (parts.length === 2) {
+                    const num = parseInt(parts[1], 10) + 1;
+                    nextNo = `${prefix}-${String(num).padStart(4, "0")}`;
+                }
+            }
+
+            callback(null, nextNo);
+        });
+    });
+}
 
 function dbValue(value, fallback = null) {
     if (value === undefined || value === null || value === "") {
@@ -29,6 +108,9 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
     app.get(`${routeBase}/list`, verifyToken, (req, res) => {
         const values = [];
         const whereParts = [];
+        const limit = clampListLimit(req.query.limit);
+        const page = Math.max(parseInt(req.query.page || "1", 10) || 1, 1);
+        const offset = (page - 1) * limit;
 
         if (req.query.is_active) {
             whereParts.push("is_active = ?");
@@ -43,9 +125,9 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
         }
 
         const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
-        const sql = `SELECT * FROM ${tableName} ${whereClause} ORDER BY ${pk} DESC`;
+        const sql = `SELECT ${columns.join(", ")} FROM ${tableName} ${whereClause} ORDER BY ${pk} DESC LIMIT ? OFFSET ?`;
 
-        pool.query(sql, values, (err, rows) => {
+        pool.query(sql, [...values, limit, offset], (err, rows) => {
             if (err) {
                 console.error(`GET ${routeBase}/list error:`, err);
                 return res.status(500).json({ error: `Failed to fetch ${label}` });
@@ -68,7 +150,7 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
         });
     });
 
-    app.post(`${routeBase}/create`, verifyToken, (req, res) => {
+    app.post(`${routeBase}/create`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
         const dateNow = now();
         const source = req.body || {};
         const insertColumns = columns.filter(col => col !== pk);
@@ -91,7 +173,7 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
         });
     });
 
-    app.put(`${routeBase}/update/:id`, verifyToken, (req, res) => {
+    app.put(`${routeBase}/update/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
         const dateNow = now();
         const source = req.body || {};
         const updateColumns = columns.filter(col => ![pk, "created_by", "created_at"].includes(col));
@@ -115,7 +197,7 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
         });
     });
 
-    app.delete(`${routeBase}/:id`, verifyToken, (req, res) => {
+    app.delete(`${routeBase}/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
         const dateNow = now();
         const updatedBy = (req.body && req.body.updated_by) || (req.user && req.user.user_id) || null;
         const sql = `UPDATE ${tableName} SET is_active = 'N', updated_at = ?${columns.includes("updated_by") ? ", updated_by = ?" : ""} WHERE ${pk} = ?`;
@@ -400,13 +482,45 @@ function registerInventoryDocumentRoutes(config) {
     } = config;
 
     app.get(`${routeBase}/list`, verifyToken, (req, res) => {
+        const values = [];
+        const whereParts = ["is_active = 'Y'"];
+        const limit = clampListLimit(req.query.limit);
+        const page = Math.max(parseInt(req.query.page || "1", 10) || 1, 1);
+        const offset = (page - 1) * limit;
+
+        if (req.query.search) {
+            whereParts.push(`(${numberColumn} LIKE ? OR status LIKE ? OR remarks LIKE ?)`);
+            for (let i = 0; i < 3; i++) values.push(`%${String(req.query.search).trim()}%`);
+        }
+
+        if (req.query[numberColumn]) {
+            whereParts.push(`${numberColumn} LIKE ?`);
+            values.push(`%${String(req.query[numberColumn]).trim()}%`);
+        }
+
+        if (req.query.status && String(req.query.status).toUpperCase() !== "ALL") {
+            whereParts.push("status = ?");
+            values.push(req.query.status);
+        }
+
+        if (req.query.from_date) {
+            whereParts.push(`${dateColumn} >= ?`);
+            values.push(req.query.from_date);
+        }
+
+        if (req.query.to_date) {
+            whereParts.push(`${dateColumn} <= ?`);
+            values.push(req.query.to_date);
+        }
+
         const sql = `
             SELECT ${listColumns.join(", ")}
             FROM ${headerTable}
-            WHERE is_active = 'Y'
+            WHERE ${whereParts.join(" AND ")}
             ORDER BY ${headerPk} DESC
+            LIMIT ? OFFSET ?
         `;
-        pool.query(sql, (err, rows) => {
+        pool.query(sql, [...values, limit, offset], (err, rows) => {
             if (err) {
                 console.error(`GET ${routeBase}/list error:`, err);
                 return res.status(500).json({ error: `Failed to fetch ${label}` });
@@ -416,21 +530,12 @@ function registerInventoryDocumentRoutes(config) {
     });
 
     app.get(`${routeBase}/nextno`, verifyToken, (req, res) => {
-        const sql = `SELECT ${numberColumn} FROM ${headerTable} ORDER BY ${headerPk} DESC LIMIT 1`;
-        pool.query(sql, (err, rows) => {
+        peekNextDocumentNumber(`${numberPrefix}_${String(label || "").replace(/\s+/g, "_").toUpperCase()}`, numberPrefix, headerTable, numberColumn, headerPk, (err, nextNo) => {
             if (err) {
                 console.error(`GET ${routeBase}/nextno error:`, err);
                 return res.status(500).json({ error: `Failed to get next ${label} number` });
             }
 
-            let nextNo = `${numberPrefix}-0001`;
-            if (rows.length > 0 && rows[0][numberColumn]) {
-                const parts = String(rows[0][numberColumn]).split("-");
-                if (parts.length === 2) {
-                    const num = parseInt(parts[1], 10) + 1;
-                    nextNo = `${numberPrefix}-${String(num).padStart(4, "0")}`;
-                }
-            }
             res.json({ [numberColumn]: nextNo });
         });
     });
@@ -458,7 +563,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.post(`${routeBase}/create`, verifyToken, (req, res) => {
+    app.post(`${routeBase}/create`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
         const dateNow = now();
         const header = req.body.header || {};
         const items = req.body.items || [];
@@ -479,7 +584,18 @@ function registerInventoryDocumentRoutes(config) {
                     return res.status(500).json({ error: "Transaction start failed" });
                 }
 
-                connection.query(headerSql, insertColumns.map(col => headerRow[col]), (err, result) => {
+                getNextDocumentNumber(connection, `${numberPrefix}_${String(label || "").replace(/\s+/g, "_").toUpperCase()}`, numberPrefix, (numberErr, nextNo) => {
+                    if (numberErr) {
+                        return connection.rollback(() => {
+                            connection.release();
+                            console.error(`POST ${routeBase}/create number error:`, numberErr);
+                            res.status(500).json({ error: `Failed to generate ${label} number` });
+                        });
+                    }
+
+                    headerRow[numberColumn] = nextNo;
+
+                    connection.query(headerSql, insertColumns.map(col => headerRow[col]), (err, result) => {
                     if (err) {
                         return connection.rollback(() => {
                             connection.release();
@@ -506,7 +622,7 @@ function registerInventoryDocumentRoutes(config) {
                         return connection.commit((commitErr) => {
                             connection.release();
                             if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                            res.json({ success: true, id: headerId });
+                            res.json({ success: true, id: headerId, [numberColumn]: nextNo });
                         });
                     }
 
@@ -540,7 +656,7 @@ function registerInventoryDocumentRoutes(config) {
                                 connection.commit((commitErr) => {
                                     connection.release();
                                     if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                                    res.json({ success: true, id: headerId });
+                                    res.json({ success: true, id: headerId, [numberColumn]: nextNo });
                                 });
                             });
                         }
@@ -548,19 +664,20 @@ function registerInventoryDocumentRoutes(config) {
                         connection.commit((commitErr) => {
                             connection.release();
                             if (commitErr) return res.status(500).json({ error: "Commit failed" });
-                            res.json({ success: true, id: headerId });
+                            res.json({ success: true, id: headerId, [numberColumn]: nextNo });
                         });
+                    });
                     });
                 });
             });
         });
     });
 
-    app.put(`${routeBase}/update/:id`, verifyToken, (req, res) => {
+    app.put(`${routeBase}/update/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
         const dateNow = now();
         const header = req.body.header || {};
         const items = req.body.items || [];
-        const updateColumns = headerColumns.filter(col => ![headerPk, "created_by", "created_at"].includes(col));
+        const updateColumns = headerColumns.filter(col => ![headerPk, numberColumn, "created_by", "created_at"].includes(col));
         const headerRow = buildInventoryHeader(header, headerColumns, headerPk, dateNow, false, headerDefaults);
         const updateSql = `UPDATE ${headerTable} SET ${updateColumns.map(col => `${col} = ?`).join(", ")} WHERE ${headerPk} = ?`;
 
@@ -634,7 +751,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.patch(`${routeBase}/status/:id`, verifyToken, (req, res) => {
+    app.patch(`${routeBase}/status/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
         const dateNow = now();
         const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;
         const sql = `UPDATE ${headerTable} SET status = ?, updated_by = ?, updated_at = ? WHERE ${headerPk} = ?`;
@@ -651,7 +768,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.delete(`${routeBase}/:id`, verifyToken, (req, res) => {
+    app.delete(`${routeBase}/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
         const dateNow = now();
         const updatedBy = (req.body && req.body.updated_by) || (req.user && req.user.user_id) || null;
 
@@ -808,6 +925,7 @@ function updateGoodsReceiptInventorySummary(connection, summaryRows, dateNow, do
               AND warehouse_id = ?
               AND is_active = 'Y'
             LIMIT 1
+            FOR UPDATE
         `;
 
         connection.query(selectSql, [row.material_id, row.warehouse_id], (selectErr, rows) => {

@@ -287,6 +287,7 @@ function serverRefresh(){
 
 
 function buildMenu(){
+	ensureMenuContainer();
 	
 	/*features = _.groupBy(features, "id")
 	
@@ -325,13 +326,47 @@ function getStoredFeatureTree() {
 	return features;
 }
 
+function ensureMenuContainer() {
+	if ($("#menuContainer").length > 0 || $(".sideMenuDivCol").length == 0) {
+		return;
+	}
+
+	$(".sideMenuDivCol").html('<div id="menuContainer" style="overflow-y:auto;"></div>');
+}
+
+function getDefaultMenuTemplateHtml() {
+	return `
+		<%_.each(parentFeatures, function(item, index){ %>
+			<table class="menuTable" id="menuTable" style="width:100%; overflow-y:auto;">
+				<tr class="menuTr" id="menuTr">
+					<td class="menuTd" id="menuTd" width="10%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons"><%= item.icon %></i></td>
+					<td class="menuTd" id="menuTd" width="90%" onclick="linkPage('<%= item.feature_url %>')"><%= (item.feature_name) %></td>
+					<% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
+						<td class="menuTd" id="menuTd" width="1%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons">arrow_drop_down</i></td>
+					<% }%>
+				</tr>
+
+				<% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
+					<%_.each(item.childFeatures, function(oitem, index){ %>
+						<tr class="menuTr" id="menuTr">
+							<td class="submenuTd" id="submenuTd" width="10%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
+							<td class="submenuTd" id="submenuTd" width="90%" onclick="linkPage('<%= oitem.feature_url %>')"><%= oitem.feature_name %></td>
+							<td class="submenuTd" id="submenuTd" width="1%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
+						</tr>
+					<% }); %>
+				<% }%>
+			</table>
+		<% }); %>
+	`;
+}
+
 function renderFeatureMenu(features) {
 	if ($("#menuContainer").length == 0) {
 		return;
 	}
 
 	if (!menuTemplateHtml) {
-		menuTemplateHtml = $("#menuTmpl").html();
+		menuTemplateHtml = $("#menuTmpl").html() || getDefaultMenuTemplateHtml();
 	}
 
 	if (!menuTemplateHtml) {

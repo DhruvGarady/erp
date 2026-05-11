@@ -1,7 +1,7 @@
 const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer");
 
-module.exports = function registerGlobalApi({ app, pool, verifyToken }) {
+module.exports = function registerGlobalApi({ app, pool, verifyToken, requireRole }) {
 //----------------------------------------------------USER TABLE------------------------------------------------
 const saltRounds = 10;
 
@@ -692,7 +692,7 @@ app.post("/user/password-reset/confirm", async (req, res) => {
     });
 });
 
-app.post("/auth/create-user", verifyToken, async (req, res) => {
+app.post("/auth/create-user", verifyToken, requireRole(["ADMIN"]), async (req, res) => {
     const {
         employee_code,
         full_name,

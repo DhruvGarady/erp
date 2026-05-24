@@ -3,7 +3,8 @@ const nodemailer = require("nodemailer");
 
 module.exports = function registerGlobalApi({ app, pool, verifyToken, requireRole }) {
 //----------------------------------------------------USER TABLE------------------------------------------------
-const saltRounds = 10;
+    const saltRounds = 10;
+    const ACCESS_ADMIN_ROLES = ["ADMIN"];
 
 const jwt = require("jsonwebtoken");
 
@@ -116,14 +117,56 @@ function normalizeFrontendBaseUrl(baseUrl) {
     }
 }
 
-function escapeEmailHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
+    function escapeEmailHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+            .replace(/'/g, "&#039;");
+    }
+
+    function toIntOrNull(value) {
+        if (value === null || value === undefined || value === "") {
+            return null;
+        }
+
+        const parsed = parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function normalizeYN(value, defaultValue) {
+        if (value === null || value === undefined || value === "") {
+            return defaultValue;
+        }
+
+        const normalized = String(value).trim().toUpperCase();
+
+        if (["Y", "YES", "TRUE", "1", "ACTIVE"].includes(normalized)) {
+            return "Y";
+        }
+
+        if (["N", "NO", "FALSE", "0", "INACTIVE"].includes(normalized)) {
+            return "N";
+        }
+
+        return defaultValue;
+    }
+
+    function getListLimit(req) {
+        const limit = parseInt(req.query.limit || "500", 10);
+
+        if (!Number.isFinite(limit) || limit <= 0) {
+            return 500;
+        }
+
+        return Math.min(limit, 5000);
+    }
+
+    function handleDbError(res, label, err) {
+        console.error(label, err);
+        return res.status(500).json({ error: label });
+    }
 
 function buildActivationEmailHtml(fullName, activationLink) {
     const safeName = escapeEmailHtml(fullName || "there");
@@ -153,11 +196,11 @@ function buildActivationEmailHtml(fullName, activationLink) {
     `;
 }
 
-function buildPasswordResetEmailHtml(fullName, resetLink) {
-    const safeName = escapeEmailHtml(fullName || "there");
-    const safeLink = escapeEmailHtml(resetLink);
+    function buildPasswordResetEmailHtml(fullName, resetLink) {
+        const safeName = escapeEmailHtml(fullName || "there");
+        const safeLink = escapeEmailHtml(resetLink);
 
-    return `
+        return `
         <div style="margin:0;padding:24px;background:#eef4fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
             <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #d8e2f1;border-radius:16px;overflow:hidden;">
                 <div style="padding:24px 28px;background:#f8fbff;border-bottom:1px solid #d8e2f1;text-align:center;">
@@ -179,7 +222,952 @@ function buildPasswordResetEmailHtml(fullName, resetLink) {
             </div>
         </div>
     `;
-}
+    }
+
+    app.get("/users/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const where = [];
+        const values = [];
+        const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
+        const search = String(req.query.search || "").trim();
+        const limit = getListLimit(req);
+
+        if (isActive !== "ALL") {
+            where.push("u.is_active = ?");
+            values.push(normalizeYN(isActive, "Y"));
+        }
+
+        if (search) {
+            where.push("(u.username LIKE ? OR u.full_name LIKE ? OR u.email LIKE ? OR u.role_name LIKE ?)");
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const sql = `
+            SELECT
+                u.user_id,
+                u.employee_code,
+                u.full_name,
+                u.username,
+                u.email,
+                u.role_name,
+                u.is_active
+            FROM boc_user u
+            ${where.length ? "WHERE " + where.join(" AND ") : ""}
+            ORDER BY u.full_name, u.username
+            LIMIT ${limit}
+        `;
+
+        pool.query(sql, values, (err, rows) => {
+            if (err) {
+                return handleDbError(res, "Failed to fetch users", err);
+            }
+
+            return res.json(rows);
+        });
+    });
+
+    app.get("/features/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const where = [];
+        const values = [];
+        const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
+        const search = String(req.query.search || "").trim();
+        const parentFeatureId = String(req.query.parent_feature_id || "").trim();
+        const limit = getListLimit(req);
+
+        if (isActive !== "ALL") {
+            where.push("f.is_active = ?");
+            values.push(normalizeYN(isActive, "Y"));
+        }
+
+        if (parentFeatureId) {
+            where.push("f.parent_feature_id = ?");
+            values.push(parentFeatureId);
+        }
+
+        if (search) {
+            where.push("(f.id LIKE ? OR f.feature_name LIKE ? OR f.feature_url LIKE ?)");
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const sql = `
+            SELECT
+                f.id,
+                f.feature_name,
+                f.feature_description,
+                f.feature_url,
+                f.display_sequence,
+                f.parent_feature_id,
+                f.icon,
+                f.is_active
+            FROM features f
+            ${where.length ? "WHERE " + where.join(" AND ") : ""}
+            ORDER BY f.display_sequence, f.feature_name
+            LIMIT ${limit}
+        `;
+
+        pool.query(sql, values, (err, rows) => {
+            if (err) {
+                return handleDbError(res, "Failed to fetch features", err);
+            }
+
+            return res.json(rows);
+        });
+    });
+
+    app.get("/roles/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const where = [];
+        const values = [];
+        const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
+        const search = String(req.query.search || "").trim();
+        const limit = getListLimit(req);
+
+        if (isActive !== "ALL") {
+            where.push("r.is_active = ?");
+            values.push(normalizeYN(isActive, "Y"));
+        }
+
+        if (search) {
+            where.push("(r.role_name LIKE ? OR r.role_description LIKE ?)");
+            values.push(`%${search}%`, `%${search}%`);
+        }
+
+        const sql = `
+            SELECT
+                r.role_id,
+                r.role_name,
+                r.role_description,
+                r.is_active,
+                r.created_at,
+                r.updated_at
+            FROM roles r
+            ${where.length ? "WHERE " + where.join(" AND ") : ""}
+            ORDER BY r.role_name
+            LIMIT ${limit}
+        `;
+
+        pool.query(sql, values, (err, rows) => {
+            if (err) {
+                return handleDbError(res, "Failed to fetch roles", err);
+            }
+
+            return res.json(rows);
+        });
+    });
+
+    app.post("/roles/create", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const roleName = String(req.body.role_name || "").trim();
+        const roleDescription = String(req.body.role_description || "").trim();
+        const isActive = normalizeYN(req.body.is_active, "Y");
+
+        if (!roleName) {
+            return res.status(400).json({ error: "Role name is required" });
+        }
+
+        const duplicateSql = `
+            SELECT role_id
+            FROM roles
+            WHERE LOWER(role_name) = LOWER(?)
+            LIMIT 1
+        `;
+
+        pool.query(duplicateSql, [roleName], (duplicateErr, duplicateRows) => {
+            if (duplicateErr) {
+                return handleDbError(res, "Failed to validate role", duplicateErr);
+            }
+
+            if (duplicateRows.length > 0) {
+                return res.status(400).json({ error: "Role name already exists" });
+            }
+
+            const dateNow = now();
+            const insertSql = `
+                INSERT INTO roles (
+                    role_name,
+                    role_description,
+                    is_active,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?)
+            `;
+
+            pool.query(insertSql, [roleName, roleDescription, isActive, dateNow, dateNow], (insertErr, result) => {
+                if (insertErr) {
+                    return handleDbError(res, "Failed to create role", insertErr);
+                }
+
+                return res.json({
+                    success: true,
+                    message: "Role created successfully",
+                    role_id: result.insertId
+                });
+            });
+        });
+    });
+
+    app.put("/roles/update/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const roleId = toIntOrNull(req.params.id);
+        const roleName = String(req.body.role_name || "").trim();
+        const roleDescription = String(req.body.role_description || "").trim();
+        const isActive = normalizeYN(req.body.is_active, "Y");
+
+        if (!roleId) {
+            return res.status(400).json({ error: "Valid role id is required" });
+        }
+
+        if (!roleName) {
+            return res.status(400).json({ error: "Role name is required" });
+        }
+
+        const duplicateSql = `
+            SELECT role_id
+            FROM roles
+            WHERE LOWER(role_name) = LOWER(?)
+              AND role_id <> ?
+            LIMIT 1
+        `;
+
+        pool.query(duplicateSql, [roleName, roleId], (duplicateErr, duplicateRows) => {
+            if (duplicateErr) {
+                return handleDbError(res, "Failed to validate role", duplicateErr);
+            }
+
+            if (duplicateRows.length > 0) {
+                return res.status(400).json({ error: "Role name already exists" });
+            }
+
+            const updateSql = `
+                UPDATE roles
+                SET role_name = ?,
+                    role_description = ?,
+                    is_active = ?,
+                    updated_at = ?
+                WHERE role_id = ?
+            `;
+
+            pool.query(updateSql, [roleName, roleDescription, isActive, now(), roleId], (updateErr, result) => {
+                if (updateErr) {
+                    return handleDbError(res, "Failed to update role", updateErr);
+                }
+
+                if (result.affectedRows === 0) {
+                    return res.status(404).json({ error: "Role not found" });
+                }
+
+                return res.json({
+                    success: true,
+                    message: "Role updated successfully"
+                });
+            });
+        });
+    });
+
+    app.delete("/roles/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const roleId = toIntOrNull(req.params.id);
+
+        if (!roleId) {
+            return res.status(400).json({ error: "Valid role id is required" });
+        }
+
+        const dependencySql = `
+            SELECT user_role_id
+            FROM user_roles
+            WHERE role_id = ?
+              AND is_active = 'Y'
+            LIMIT 1
+        `;
+
+        pool.query(dependencySql, [roleId], (dependencyErr, dependencyRows) => {
+            if (dependencyErr) {
+                return handleDbError(res, "Failed to validate role usage", dependencyErr);
+            }
+
+            if (dependencyRows.length > 0) {
+                return res.status(400).json({ error: "Role is assigned to active users. Remove user role assignments first." });
+            }
+
+            const deleteSql = `
+                UPDATE roles
+                SET is_active = 'N',
+                    updated_at = ?
+                WHERE role_id = ?
+            `;
+
+            pool.query(deleteSql, [now(), roleId], (deleteErr, result) => {
+                if (deleteErr) {
+                    return handleDbError(res, "Failed to deactivate role", deleteErr);
+                }
+
+                if (result.affectedRows === 0) {
+                    return res.status(404).json({ error: "Role not found" });
+                }
+
+                return res.json({
+                    success: true,
+                    message: "Role deactivated successfully"
+                });
+            });
+        });
+    });
+
+    app.get("/roles/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const roleId = toIntOrNull(req.params.id);
+
+        if (!roleId) {
+            return res.status(400).json({ error: "Valid role id is required" });
+        }
+
+        const sql = `
+            SELECT
+                role_id,
+                role_name,
+                role_description,
+                is_active,
+                created_at,
+                updated_at
+            FROM roles
+            WHERE role_id = ?
+            LIMIT 1
+        `;
+
+        pool.query(sql, [roleId], (err, rows) => {
+            if (err) {
+                return handleDbError(res, "Failed to fetch role", err);
+            }
+
+            if (!rows.length) {
+                return res.status(404).json({ error: "Role not found" });
+            }
+
+            return res.json(rows[0]);
+        });
+    });
+
+    app.get("/userroles/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const where = [];
+        const values = [];
+        const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
+        const search = String(req.query.search || "").trim();
+        const userId = toIntOrNull(req.query.user_id);
+        const roleId = toIntOrNull(req.query.role_id);
+        const limit = getListLimit(req);
+
+        if (isActive !== "ALL") {
+            where.push("ur.is_active = ?");
+            values.push(normalizeYN(isActive, "Y"));
+        }
+
+        if (userId) {
+            where.push("ur.user_id = ?");
+            values.push(userId);
+        }
+
+        if (roleId) {
+            where.push("ur.role_id = ?");
+            values.push(roleId);
+        }
+
+        if (search) {
+            where.push("(u.username LIKE ? OR u.full_name LIKE ? OR r.role_name LIKE ?)");
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const sql = `
+            SELECT
+                ur.user_role_id,
+                ur.user_id,
+                u.username,
+                u.full_name,
+                u.email,
+                ur.role_id,
+                r.role_name,
+                ur.is_active,
+                ur.created_at,
+                ur.updated_at
+            FROM user_roles ur
+            LEFT JOIN boc_user u ON u.user_id = ur.user_id
+            LEFT JOIN roles r ON r.role_id = ur.role_id
+            ${where.length ? "WHERE " + where.join(" AND ") : ""}
+            ORDER BY u.full_name, r.role_name
+            LIMIT ${limit}
+        `;
+
+        pool.query(sql, values, (err, rows) => {
+            if (err) {
+                return handleDbError(res, "Failed to fetch user roles", err);
+            }
+
+            return res.json(rows);
+        });
+    });
+
+    app.post("/userroles/create", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const userId = toIntOrNull(req.body.user_id);
+        const roleId = toIntOrNull(req.body.role_id);
+        const isActive = normalizeYN(req.body.is_active, "Y");
+
+        if (!userId || !roleId) {
+            return res.status(400).json({ error: "User and role are required" });
+        }
+
+        const validationSql = `
+            SELECT
+                (SELECT COUNT(*) FROM boc_user WHERE user_id = ? AND is_active = 'Y') AS user_count,
+                (SELECT COUNT(*) FROM roles WHERE role_id = ? AND is_active = 'Y') AS role_count
+        `;
+
+        pool.query(validationSql, [userId, roleId], (validationErr, validationRows) => {
+            if (validationErr) {
+                return handleDbError(res, "Failed to validate user role", validationErr);
+            }
+
+            const validation = validationRows[0] || {};
+
+            if (!validation.user_count) {
+                return res.status(400).json({ error: "Active user was not found" });
+            }
+
+            if (!validation.role_count) {
+                return res.status(400).json({ error: "Active role was not found" });
+            }
+
+            const duplicateSql = `
+                SELECT user_role_id
+                FROM user_roles
+                WHERE user_id = ?
+                  AND role_id = ?
+                  AND is_active = 'Y'
+                LIMIT 1
+            `;
+
+            pool.query(duplicateSql, [userId, roleId], (duplicateErr, duplicateRows) => {
+                if (duplicateErr) {
+                    return handleDbError(res, "Failed to validate user role duplicate", duplicateErr);
+                }
+
+                if (duplicateRows.length > 0) {
+                    return res.status(400).json({ error: "This active user role assignment already exists" });
+                }
+
+                const dateNow = now();
+                const insertSql = `
+                    INSERT INTO user_roles (
+                        user_id,
+                        role_id,
+                        is_active,
+                        created_at,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                `;
+
+                pool.query(insertSql, [userId, roleId, isActive, dateNow, dateNow], (insertErr, result) => {
+                    if (insertErr) {
+                        return handleDbError(res, "Failed to create user role", insertErr);
+                    }
+
+                    return res.json({
+                        success: true,
+                        message: "User role created successfully",
+                        user_role_id: result.insertId
+                    });
+                });
+            });
+        });
+    });
+
+    app.put("/userroles/update/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const userRoleId = toIntOrNull(req.params.id);
+        const userId = toIntOrNull(req.body.user_id);
+        const roleId = toIntOrNull(req.body.role_id);
+        const isActive = normalizeYN(req.body.is_active, "Y");
+
+        if (!userRoleId) {
+            return res.status(400).json({ error: "Valid user role id is required" });
+        }
+
+        if (!userId || !roleId) {
+            return res.status(400).json({ error: "User and role are required" });
+        }
+
+        const validationSql = `
+            SELECT
+                (SELECT COUNT(*) FROM boc_user WHERE user_id = ? AND is_active = 'Y') AS user_count,
+                (SELECT COUNT(*) FROM roles WHERE role_id = ? AND is_active = 'Y') AS role_count
+        `;
+
+        pool.query(validationSql, [userId, roleId], (validationErr, validationRows) => {
+            if (validationErr) {
+                return handleDbError(res, "Failed to validate user role", validationErr);
+            }
+
+            const validation = validationRows[0] || {};
+
+            if (!validation.user_count) {
+                return res.status(400).json({ error: "Active user was not found" });
+            }
+
+            if (!validation.role_count) {
+                return res.status(400).json({ error: "Active role was not found" });
+            }
+
+            const duplicateSql = `
+                SELECT user_role_id
+                FROM user_roles
+                WHERE user_id = ?
+                  AND role_id = ?
+                  AND is_active = 'Y'
+                  AND user_role_id <> ?
+                LIMIT 1
+            `;
+
+            pool.query(duplicateSql, [userId, roleId, userRoleId], (duplicateErr, duplicateRows) => {
+                if (duplicateErr) {
+                    return handleDbError(res, "Failed to validate user role duplicate", duplicateErr);
+                }
+
+                if (duplicateRows.length > 0) {
+                    return res.status(400).json({ error: "This active user role assignment already exists" });
+                }
+
+                const updateSql = `
+                    UPDATE user_roles
+                    SET user_id = ?,
+                        role_id = ?,
+                        is_active = ?,
+                        updated_at = ?
+                    WHERE user_role_id = ?
+                `;
+
+                pool.query(updateSql, [userId, roleId, isActive, now(), userRoleId], (updateErr, result) => {
+                    if (updateErr) {
+                        return handleDbError(res, "Failed to update user role", updateErr);
+                    }
+
+                    if (result.affectedRows === 0) {
+                        return res.status(404).json({ error: "User role not found" });
+                    }
+
+                    return res.json({
+                        success: true,
+                        message: "User role updated successfully"
+                    });
+                });
+            });
+        });
+    });
+
+    app.delete("/userroles/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const userRoleId = toIntOrNull(req.params.id);
+
+        if (!userRoleId) {
+            return res.status(400).json({ error: "Valid user role id is required" });
+        }
+
+        const sql = `
+            UPDATE user_roles
+            SET is_active = 'N',
+                updated_at = ?
+            WHERE user_role_id = ?
+        `;
+
+        pool.query(sql, [now(), userRoleId], (err, result) => {
+            if (err) {
+                return handleDbError(res, "Failed to deactivate user role", err);
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "User role not found" });
+            }
+
+            return res.json({
+                success: true,
+                message: "User role deactivated successfully"
+            });
+        });
+    });
+
+    app.get("/userroles/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const userRoleId = toIntOrNull(req.params.id);
+
+        if (!userRoleId) {
+            return res.status(400).json({ error: "Valid user role id is required" });
+        }
+
+        const sql = `
+            SELECT
+                ur.user_role_id,
+                ur.user_id,
+                u.username,
+                u.full_name,
+                u.email,
+                ur.role_id,
+                r.role_name,
+                ur.is_active,
+                ur.created_at,
+                ur.updated_at
+            FROM user_roles ur
+            LEFT JOIN boc_user u ON u.user_id = ur.user_id
+            LEFT JOIN roles r ON r.role_id = ur.role_id
+            WHERE ur.user_role_id = ?
+            LIMIT 1
+        `;
+
+        pool.query(sql, [userRoleId], (err, rows) => {
+            if (err) {
+                return handleDbError(res, "Failed to fetch user role", err);
+            }
+
+            if (!rows.length) {
+                return res.status(404).json({ error: "User role not found" });
+            }
+
+            return res.json(rows[0]);
+        });
+    });
+
+    app.get("/rolefeatures/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const where = [];
+        const values = [];
+        const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
+        const search = String(req.query.search || "").trim();
+        const roleId = toIntOrNull(req.query.role_id);
+        const featureId = String(req.query.feature_id || "").trim();
+        const limit = getListLimit(req);
+
+        if (isActive !== "ALL") {
+            where.push("rf.is_active = ?");
+            values.push(normalizeYN(isActive, "Y"));
+        }
+
+        if (roleId) {
+            where.push("rf.role_id = ?");
+            values.push(roleId);
+        }
+
+        if (featureId) {
+            where.push("rf.feature_id = ?");
+            values.push(featureId);
+        }
+
+        if (search) {
+            where.push("(r.role_name LIKE ? OR f.feature_name LIKE ? OR f.feature_url LIKE ?)");
+            values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const sql = `
+            SELECT
+                rf.role_feature_id,
+                rf.role_id,
+                r.role_name,
+                rf.feature_id,
+                f.feature_name,
+                f.feature_url,
+                f.parent_feature_id,
+                f.display_sequence,
+                rf.can_view,
+                rf.can_create,
+                rf.can_edit,
+                rf.can_delete,
+                rf.can_approve,
+                rf.can_print,
+                rf.is_active,
+                rf.created_at,
+                rf.updated_at
+            FROM role_features rf
+            LEFT JOIN roles r ON r.role_id = rf.role_id
+            LEFT JOIN features f ON f.id = rf.feature_id
+            ${where.length ? "WHERE " + where.join(" AND ") : ""}
+            ORDER BY r.role_name, f.display_sequence, f.feature_name
+            LIMIT ${limit}
+        `;
+
+        pool.query(sql, values, (err, rows) => {
+            if (err) {
+                return handleDbError(res, "Failed to fetch role features", err);
+            }
+
+            return res.json(rows);
+        });
+    });
+
+    app.post("/rolefeatures/create", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const roleId = toIntOrNull(req.body.role_id);
+        const featureId = String(req.body.feature_id || "").trim();
+        const canView = normalizeYN(req.body.can_view, "Y");
+        const canCreate = normalizeYN(req.body.can_create, "N");
+        const canEdit = normalizeYN(req.body.can_edit, "N");
+        const canDelete = normalizeYN(req.body.can_delete, "N");
+        const canApprove = normalizeYN(req.body.can_approve, "N");
+        const canPrint = normalizeYN(req.body.can_print, "N");
+        const isActive = normalizeYN(req.body.is_active, "Y");
+
+        if (!roleId || !featureId) {
+            return res.status(400).json({ error: "Role and feature are required" });
+        }
+
+        const validationSql = `
+            SELECT
+                (SELECT COUNT(*) FROM roles WHERE role_id = ? AND is_active = 'Y') AS role_count,
+                (SELECT COUNT(*) FROM features WHERE id = ? AND is_active = 'Y') AS feature_count
+        `;
+
+        pool.query(validationSql, [roleId, featureId], (validationErr, validationRows) => {
+            if (validationErr) {
+                return handleDbError(res, "Failed to validate role feature", validationErr);
+            }
+
+            const validation = validationRows[0] || {};
+
+            if (!validation.role_count) {
+                return res.status(400).json({ error: "Active role was not found" });
+            }
+
+            if (!validation.feature_count) {
+                return res.status(400).json({ error: "Active feature was not found" });
+            }
+
+            const duplicateSql = `
+                SELECT role_feature_id
+                FROM role_features
+                WHERE role_id = ?
+                  AND feature_id = ?
+                  AND is_active = 'Y'
+                LIMIT 1
+            `;
+
+            pool.query(duplicateSql, [roleId, featureId], (duplicateErr, duplicateRows) => {
+                if (duplicateErr) {
+                    return handleDbError(res, "Failed to validate role feature duplicate", duplicateErr);
+                }
+
+                if (duplicateRows.length > 0) {
+                    return res.status(400).json({ error: "This active role feature mapping already exists" });
+                }
+
+                const dateNow = now();
+                const insertSql = `
+                    INSERT INTO role_features (
+                        role_id,
+                        feature_id,
+                        can_view,
+                        can_create,
+                        can_edit,
+                        can_delete,
+                        can_approve,
+                        can_print,
+                        is_active,
+                        created_at,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `;
+                const values = [
+                    roleId,
+                    featureId,
+                    canView,
+                    canCreate,
+                    canEdit,
+                    canDelete,
+                    canApprove,
+                    canPrint,
+                    isActive,
+                    dateNow,
+                    dateNow
+                ];
+
+                pool.query(insertSql, values, (insertErr, result) => {
+                    if (insertErr) {
+                        return handleDbError(res, "Failed to create role feature", insertErr);
+                    }
+
+                    return res.json({
+                        success: true,
+                        message: "Role feature created successfully",
+                        role_feature_id: result.insertId
+                    });
+                });
+            });
+        });
+    });
+
+    app.put("/rolefeatures/update/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const roleFeatureId = toIntOrNull(req.params.id);
+        const roleId = toIntOrNull(req.body.role_id);
+        const featureId = String(req.body.feature_id || "").trim();
+        const canView = normalizeYN(req.body.can_view, "Y");
+        const canCreate = normalizeYN(req.body.can_create, "N");
+        const canEdit = normalizeYN(req.body.can_edit, "N");
+        const canDelete = normalizeYN(req.body.can_delete, "N");
+        const canApprove = normalizeYN(req.body.can_approve, "N");
+        const canPrint = normalizeYN(req.body.can_print, "N");
+        const isActive = normalizeYN(req.body.is_active, "Y");
+
+        if (!roleFeatureId) {
+            return res.status(400).json({ error: "Valid role feature id is required" });
+        }
+
+        if (!roleId || !featureId) {
+            return res.status(400).json({ error: "Role and feature are required" });
+        }
+
+        const validationSql = `
+            SELECT
+                (SELECT COUNT(*) FROM roles WHERE role_id = ? AND is_active = 'Y') AS role_count,
+                (SELECT COUNT(*) FROM features WHERE id = ? AND is_active = 'Y') AS feature_count
+        `;
+
+        pool.query(validationSql, [roleId, featureId], (validationErr, validationRows) => {
+            if (validationErr) {
+                return handleDbError(res, "Failed to validate role feature", validationErr);
+            }
+
+            const validation = validationRows[0] || {};
+
+            if (!validation.role_count) {
+                return res.status(400).json({ error: "Active role was not found" });
+            }
+
+            if (!validation.feature_count) {
+                return res.status(400).json({ error: "Active feature was not found" });
+            }
+
+            const duplicateSql = `
+                SELECT role_feature_id
+                FROM role_features
+                WHERE role_id = ?
+                  AND feature_id = ?
+                  AND is_active = 'Y'
+                  AND role_feature_id <> ?
+                LIMIT 1
+            `;
+
+            pool.query(duplicateSql, [roleId, featureId, roleFeatureId], (duplicateErr, duplicateRows) => {
+                if (duplicateErr) {
+                    return handleDbError(res, "Failed to validate role feature duplicate", duplicateErr);
+                }
+
+                if (duplicateRows.length > 0) {
+                    return res.status(400).json({ error: "This active role feature mapping already exists" });
+                }
+
+                const updateSql = `
+                    UPDATE role_features
+                    SET role_id = ?,
+                        feature_id = ?,
+                        can_view = ?,
+                        can_create = ?,
+                        can_edit = ?,
+                        can_delete = ?,
+                        can_approve = ?,
+                        can_print = ?,
+                        is_active = ?,
+                        updated_at = ?
+                    WHERE role_feature_id = ?
+                `;
+                const values = [
+                    roleId,
+                    featureId,
+                    canView,
+                    canCreate,
+                    canEdit,
+                    canDelete,
+                    canApprove,
+                    canPrint,
+                    isActive,
+                    now(),
+                    roleFeatureId
+                ];
+
+                pool.query(updateSql, values, (updateErr, result) => {
+                    if (updateErr) {
+                        return handleDbError(res, "Failed to update role feature", updateErr);
+                    }
+
+                    if (result.affectedRows === 0) {
+                        return res.status(404).json({ error: "Role feature not found" });
+                    }
+
+                    return res.json({
+                        success: true,
+                        message: "Role feature updated successfully"
+                    });
+                });
+            });
+        });
+    });
+
+    app.delete("/rolefeatures/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const roleFeatureId = toIntOrNull(req.params.id);
+
+        if (!roleFeatureId) {
+            return res.status(400).json({ error: "Valid role feature id is required" });
+        }
+
+        const sql = `
+            UPDATE role_features
+            SET is_active = 'N',
+                updated_at = ?
+            WHERE role_feature_id = ?
+        `;
+
+        pool.query(sql, [now(), roleFeatureId], (err, result) => {
+            if (err) {
+                return handleDbError(res, "Failed to deactivate role feature", err);
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: "Role feature not found" });
+            }
+
+            return res.json({
+                success: true,
+                message: "Role feature deactivated successfully"
+            });
+        });
+    });
+
+    app.get("/rolefeatures/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+        const roleFeatureId = toIntOrNull(req.params.id);
+
+        if (!roleFeatureId) {
+            return res.status(400).json({ error: "Valid role feature id is required" });
+        }
+
+        const sql = `
+            SELECT
+                rf.role_feature_id,
+                rf.role_id,
+                r.role_name,
+                rf.feature_id,
+                f.feature_name,
+                f.feature_url,
+                f.parent_feature_id,
+                f.display_sequence,
+                rf.can_view,
+                rf.can_create,
+                rf.can_edit,
+                rf.can_delete,
+                rf.can_approve,
+                rf.can_print,
+                rf.is_active,
+                rf.created_at,
+                rf.updated_at
+            FROM role_features rf
+            LEFT JOIN roles r ON r.role_id = rf.role_id
+            LEFT JOIN features f ON f.id = rf.feature_id
+            WHERE rf.role_feature_id = ?
+            LIMIT 1
+        `;
+
+        pool.query(sql, [roleFeatureId], (err, rows) => {
+            if (err) {
+                return handleDbError(res, "Failed to fetch role feature", err);
+            }
+
+            if (!rows.length) {
+                return res.status(404).json({ error: "Role feature not found" });
+            }
+
+            return res.json(rows[0]);
+        });
+    });
 
 app.post("/auth/login", (req, res) => {
     const username = (req.body.username || "").trim();

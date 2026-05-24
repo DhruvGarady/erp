@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+
+  <title>User Role Add/Edit</title>
+  <link rel="shortcut icon" href="../../global/css/images/images.png">
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../../global/libs/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../../global/css/style_et_1.css">
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+
+  <script src="../../global/libs/jquery/jquery.min.js" type="text/javascript"></script>
+  <script src="../../global/libs/jquery/jquery-ui.js" type="text/javascript"></script>
+  <script src="../../global/libs/bootstrap/bootstrap.min.js" type="text/javascript"></script>
+  <script src="../../global/libs/underscore/underscore.js" type="text/javascript"></script>
+  <script src="../../global/libs/jquery/jquery-validation.js" type="text/javascript"></script>
+  <script src="../../global/libs/jquery/jquery_modal.js" type="text/javascript"></script>
+  <script src="../../global/libs/jquery/xlsx.full.min.js" type="text/javascript"></script>
+  <script src="../../global/global_exp1.js" type="text/javascript"></script>
+  <script src="../../global/properties.js" type="text/javascript"></script>
+
+  <script src="scripts/user_roles_add.js"></script>
+</head>
+
+<style>
+  body {
+    margin: 0;
+    height: 100%;
+  }
+
+  label {
+    margin-bottom: 0 !important;
+  }
+
+  .btn.dropdown-toggle::after {
+    display: none !important;
+  }
+</style>
+
+<body>
+
+  <nav class="navbar">
+    <div class="container-fluid d-flex justify-content-between align-items-center mainNav">
+      <div class="d-flex align-items-center">
+        <a class="navbar-brand m-0" href="../home.html">
+          <img src="../../global/css/images/logo2.png" alt="Logo" height="40">
+        </a>
+        <i class="material-icons ml-2" style="cursor:pointer;font-size: 28px; color:white;" onclick="collapseMenu()">menu</i>
+      </div>
+
+      <div class="nav-feature-search">
+        <span class="material-icons">search</span>
+        <input type="text" id="featureSearch" placeholder="Search feature..." autocomplete="off">
+      </div>
+
+      <div>
+        <div class="btn-group dropleft">
+          <button type="button" class="btn btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" id="userName"></button>
+          <div class="dropdown-menu">
+            <a class="dropdown-item profile-settings-menu-item" href="javascript:void(0);"><span class="material-icons profile-menu-icon">settings</span><span>Profile Settings</span></a>
+            <a class="dropdown-item" href="javascript:void(0);" onclick="functionLogout()"><span class="material-icons profile-menu-icon">logout</span><span>Logout</span></a>
+          </div>
+          <img src="" id="profilePicture" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="row">
+    <div class="col-sm-2 sideMenuDivCol">
+      <div id="menuContainer" style="overflow-y:auto;"></div>
+    </div>
+
+    <div class="col-sm-10 mainDiv">
+      <div class="fullSectionDiv">
+        <table width="100%">
+          <tr>
+            <td width="85%" class="mainTblHdr" id="pageTitle">User Role Information:</td>
+
+            <td style="text-align:right;">
+              <button onclick="backToInquiry()" class="searchButton bg-danger">
+                <span class="material-icons">arrow_back</span>
+                <span>Back</span>
+              </button>
+            </td>
+            <td width="1%"></td>
+            <td style="text-align:right;">
+              <button onclick="saveUserRole()" class="searchButton bg-primary">
+                <span class="material-icons">save</span>
+                <span>Save</span>
+              </button>
+            </td>
+          </tr>
+        </table>
+
+        <br>
+        <ul class="nav nav-tabs" id="userRoleTab" role="tablist">
+          <li class="nav-item"><a class="nav-link active" id="basic-tab" data-toggle="tab" href="#basic" role="tab">Basic</a></li>
+        </ul>
+
+        <div class="tab-content border" id="userRoleTabContent">
+          <div class="tab-pane fade show active" id="basic" role="tabpanel" style="margin:17px;">
+            <table width="100%">
+              <tr>
+                <td width="30%">
+                  <div class="form-group">
+                    User <span style="color:red;">*</span>
+                    <select id="user_id" name="user_id">
+                      <option value="">Select</option>
+                    </select>
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="30%">
+                  <div class="form-group">
+                    Role <span style="color:red;">*</span>
+                    <select id="role_id" name="role_id">
+                      <option value="">Select</option>
+                    </select>
+                  </div>
+                </td>
+                <td width="5%"></td>
+                <td width="20%">
+                  <div class="form-group">
+                    Status
+                    <select id="is_active" name="is_active">
+                      <option value="Y">Active</option>
+                      <option value="N">Inactive</option>
+                    </select>
+                  </div>
+                </td>
+                <td></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>

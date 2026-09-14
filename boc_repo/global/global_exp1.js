@@ -48,7 +48,7 @@ function collapseMenu() {
 
     if (menu_scale == "FULL") {
         $('.sideMenuDivCol').fadeOut(100, function() {
-            $('.mainDiv').removeClass('col-md-10').addClass('col-md-12');
+            $('.mainDiv').removeClass('col-sm-10 col-md-10').addClass('col-sm-12 col-md-12');
 			$('.sectionDiv').css('margin-left', '10px');
 			$('.sectionDivHead').css('margin-left', '10px');
         });
@@ -57,7 +57,7 @@ function collapseMenu() {
     } else if (menu_scale == "COLLAPSED") {
         // Expand sidebar
         $('.sideMenuDivCol').fadeIn(100, function() {
-            $('.mainDiv').removeClass('col-md-12').addClass('col-md-10');
+            $('.mainDiv').removeClass('col-sm-12 col-md-12').addClass('col-sm-10 col-md-10');
 			$('.sectionDiv').css('margin-left', '0');
 			$('.sectionDivHead').css('margin-left', '0');
         });
@@ -305,10 +305,24 @@ function buildMenu(){
 	
 	parentFeatures = getStoredFeatureTree();
 	renderFeatureMenu(parentFeatures);
+	applyStoredMenuCollapseState();
 	setupFeatureSearch();
 
 	//console.log(JSON.stringify(parentFeatures));
 	
+}
+
+function applyStoredMenuCollapseState() {
+	var menu_scale = sessionStorage.getItem("MENU_COLLAPSE");
+
+	if (menu_scale != "COLLAPSED") {
+		return;
+	}
+
+	$('.sideMenuDivCol').hide();
+	$('.mainDiv').removeClass('col-sm-10 col-md-10').addClass('col-sm-12 col-md-12');
+	$('.sectionDiv').css('margin-left', '10px');
+	$('.sectionDivHead').css('margin-left', '10px');
 }
 
 function getStoredFeatureTree() {
@@ -337,21 +351,25 @@ function ensureMenuContainer() {
 function getDefaultMenuTemplateHtml() {
 	return `
 		<%_.each(parentFeatures, function(item, index){ %>
-			<table class="menuTable" id="menuTable" style="width:100%; overflow-y:auto;">
-				<tr class="menuTr" id="menuTr">
-					<td class="menuTd" id="menuTd" width="10%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons"><%= item.icon %></i></td>
-					<td class="menuTd" id="menuTd" width="90%" onclick="linkPage('<%= item.feature_url %>')"><%= (item.feature_name) %></td>
-					<% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
-						<td class="menuTd" id="menuTd" width="1%" onclick="linkPage('<%= item.feature_url %>')"><i class="material-icons">arrow_drop_down</i></td>
+			<%
+				var hasChildren = item.childFeatures != null && item.childFeatures != undefined && item.childFeatures.length > 0;
+				var menuFeatureId = item.id || ('menu_' + index);
+			%>
+			<table class="menuTable" id="menuTable" data-feature-id="<%- menuFeatureId %>" style="width:100%; overflow-y:auto;">
+				<tr class="menuTr menu-parent-row" id="menuTr" data-feature-id="<%- menuFeatureId %>" data-menu-url="<%- item.feature_url || '' %>" data-has-children="<%- hasChildren ? 'Y' : 'N' %>">
+					<td class="menuTd" id="menuTd" width="10%"><i class="material-icons"><%- item.icon || 'folder' %></i></td>
+					<td class="menuTd" id="menuTd" width="88%"><%- item.feature_name || '' %></td>
+					<% if(hasChildren){%>
+						<td class="menuTd menu-toggle-cell" id="menuTd" width="2%"><i class="material-icons menu-toggle-icon">keyboard_arrow_right</i></td>
 					<% }%>
 				</tr>
 
-				<% if(item.childFeatures != null && item.childFeatures != undefined && item.childFeatures != ""){%>
+				<% if(hasChildren){%>
 					<%_.each(item.childFeatures, function(oitem, index){ %>
-						<tr class="menuTr" id="menuTr">
-							<td class="submenuTd" id="submenuTd" width="10%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
-							<td class="submenuTd" id="submenuTd" width="90%" onclick="linkPage('<%= oitem.feature_url %>')"><%= oitem.feature_name %></td>
-							<td class="submenuTd" id="submenuTd" width="1%" onclick="linkPage('<%= oitem.feature_url %>')"></td>
+						<tr class="menuTr submenu-row" id="menuTr" data-parent-feature-id="<%- menuFeatureId %>" data-menu-url="<%- oitem.feature_url || '' %>" style="display:none;">
+							<td class="submenuTd" id="submenuTd" width="10%"></td>
+							<td class="submenuTd" id="submenuTd" width="88%"><%- oitem.feature_name || '' %></td>
+							<td class="submenuTd" id="submenuTd" width="2%"></td>
 						</tr>
 					<% }); %>
 				<% }%>
@@ -360,7 +378,7 @@ function getDefaultMenuTemplateHtml() {
 	`;
 }
 
-function renderFeatureMenu(features) {
+function renderFeatureMenu(features, options) {
 	if ($("#menuContainer").length == 0) {
 		return;
 	}
@@ -377,7 +395,108 @@ function renderFeatureMenu(features) {
 	var template = _.template(menuTemplateHtml);
 	$("#menuContainer").html(template({ parentFeatures: parentFeatures }));
 	$('#menuContainer').trigger("create");
+	bindMenuInteractions();
+	applyMenuGroupState(options);
 	applyActiveMenuState();
+}
+
+function bindMenuInteractions() {
+	$("#menuContainer")
+		.off("click.menuNav")
+		.on("click.menuNav", ".menu-parent-row", function() {
+			var row = $(this);
+			var hasChildren = row.attr("data-has-children") == "Y";
+			var featureId = row.attr("data-feature-id");
+			var rowUrl = getMenuRowUrl(row);
+
+			if (hasChildren) {
+				toggleMenuGroup(featureId);
+				return;
+			}
+
+			linkPage(rowUrl);
+		})
+		.on("click.menuNav", ".submenu-row", function() {
+			linkPage(getMenuRowUrl($(this)));
+		});
+}
+
+function applyMenuGroupState(options) {
+	var expandAll = options && options.expandAll;
+
+	$("#menuContainer .menu-parent-row").each(function() {
+		var row = $(this);
+		var featureId = row.attr("data-feature-id");
+		var hasChildren = row.attr("data-has-children") == "Y";
+
+		if (!hasChildren) {
+			return;
+		}
+
+		setMenuGroupOpen(featureId, expandAll || isMenuGroupExpanded(featureId), false);
+	});
+}
+
+function toggleMenuGroup(featureId) {
+	if (!featureId) {
+		return;
+	}
+
+	setMenuGroupOpen(featureId, !isMenuGroupCurrentlyOpen(featureId), true);
+}
+
+function setMenuGroupOpen(featureId, isOpen, persist) {
+	var parentRow = $("#menuContainer .menu-parent-row[data-feature-id='" + escapeMenuSelectorValue(featureId) + "']");
+	var childRows = $("#menuContainer .submenu-row[data-parent-feature-id='" + escapeMenuSelectorValue(featureId) + "']");
+
+	if (isOpen) {
+		parentRow.addClass("menu-group-open");
+		childRows.stop(true, true).slideDown(120);
+	} else {
+		parentRow.removeClass("menu-group-open");
+		childRows.stop(true, true).slideUp(120);
+	}
+
+	if (persist) {
+		setStoredMenuGroupExpanded(featureId, isOpen);
+	}
+}
+
+function isMenuGroupCurrentlyOpen(featureId) {
+	return $("#menuContainer .menu-parent-row[data-feature-id='" + escapeMenuSelectorValue(featureId) + "']").hasClass("menu-group-open");
+}
+
+function getStoredMenuExpandedGroups() {
+	var expandedText = sessionStorage.getItem("MENU_EXPANDED_GROUPS");
+
+	if (!expandedText) {
+		return {};
+	}
+
+	try {
+		return JSON.parse(expandedText) || {};
+	} catch (e) {
+		return {};
+	}
+}
+
+function isMenuGroupExpanded(featureId) {
+	var expandedGroups = getStoredMenuExpandedGroups();
+	return expandedGroups[String(featureId)] == true;
+}
+
+function setStoredMenuGroupExpanded(featureId, isOpen) {
+	var expandedGroups = getStoredMenuExpandedGroups();
+	expandedGroups[String(featureId)] = !!isOpen;
+	sessionStorage.setItem("MENU_EXPANDED_GROUPS", JSON.stringify(expandedGroups));
+}
+
+function escapeMenuSelectorValue(value) {
+	if ($.escapeSelector) {
+		return $.escapeSelector(String(value || ""));
+	}
+
+	return String(value || "").replace(/([ #;&,.+*~':"!^$[\]()=>|\/@])/g, "\\$1");
 }
 
 function applyActiveMenuState() {
@@ -400,7 +519,11 @@ function applyActiveMenuState() {
 }
 
 function getMenuRowUrl(row) {
-	var rowUrl = "";
+	var rowUrl = row.attr("data-menu-url") || "";
+
+	if (rowUrl) {
+		return rowUrl;
+	}
 
 	row.find("td").each(function() {
 		var clickText = $(this).attr("onclick") || "";
@@ -493,6 +616,7 @@ function markNearestParentMenu(activeRow) {
 
 	if (firstRow.length && !firstRow.is(activeRow)) {
 		firstRow.addClass("active-parent-menu-row");
+		setMenuGroupOpen(firstRow.attr("data-feature-id"), true, false);
 	}
 }
 
@@ -604,7 +728,7 @@ function filterFeatureMenu(searchText) {
 		return;
 	}
 
-	renderFeatureMenu(getFilteredFeatureTree(features, searchTerm));
+	renderFeatureMenu(getFilteredFeatureTree(features, searchTerm), { expandAll: true });
 }
 
 function getFilteredFeatureTree(features, searchTerm) {

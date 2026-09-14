@@ -199,6 +199,44 @@ html, body {
     transition: background 0.3s;
 }
 
+.menuTable {
+	margin: 0;
+	border-spacing: 0;
+}
+
+.menu-parent-row .menu-toggle-cell {
+	text-align: right;
+}
+
+.menu-toggle-icon {
+	font-size: 18px;
+	transition: transform 0.18s ease;
+}
+
+.menu-parent-row.menu-group-open .menu-toggle-icon {
+	transform: rotate(90deg);
+}
+
+.submenu-row td {
+	background: rgba(0, 0, 0, 0.08);
+}
+
+.submenu-row .submenuTd {
+	padding-top: 8px !important;
+	padding-bottom: 8px !important;
+	font-size: .79rem !important;
+	font-weight: 600 !important;
+	color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.submenu-row .submenuTd:nth-child(2) {
+	padding-left: 18px !important;
+}
+
+.menu-parent-row.menu-group-open {
+	background: rgba(255, 255, 255, 0.06);
+}
+
 
 #menuTd, #submenuTd{
 	text-transform: capitalize;;

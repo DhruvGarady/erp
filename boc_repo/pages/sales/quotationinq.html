@@ -172,11 +172,11 @@
                 <th width="8%">Currency</th>
                 <th width="10%">Grand Total</th>
                 <th width="9%">Valid Till</th>
-                <th width="3%">Print</th>
-                <th width="3%">Approve</th>
-                <th width="3%">Order</th>
-                <th width="3%">Edit</th>
-                <th width="3%" style="text-align:center;">Del</th>
+                <th data-perm="print" width="3%">Print</th>
+                <th data-perm="approve" width="3%">Approve</th>
+                <% if(canCreateSalesOrder){ %><th width="3%">Order</th><% } %>
+                <th data-perm="edit" width="3%">Edit</th>
+                <th data-perm="delete" width="3%" style="text-align:center;">Del</th>
               </tr>
 
               <%_.each(quotations, function(item){ %>
@@ -191,19 +191,21 @@
                   <td><%= item.currency || '' %></td>
                   <td><%= formatAmount(item.grand_total) %></td>
                   <td><%= formatDate(item.valid_till) %></td>
-                  <td style="text-align:center;">
+                  <td data-perm="print" data-perm-cell style="text-align:center;">
                     <div class="tooltip-wrapper" onclick="printQuotation(<%= item.quotation_id %>)"><i class="material-icons" style="color:#343a40;">print</i><div class="tooltip-text">Print quotation</div></div>
                   </td>
-                  <td style="text-align:center;">
+                  <td data-perm="approve" data-perm-cell style="text-align:center;">
                     <% if(canApproveQuotation(item)){ %>
                       <div class="tooltip-wrapper" onclick="approveQuotation(<%= item.quotation_id %>)"><i class="material-icons" style="color:#1a9f55;">verified</i><div class="tooltip-text">Approve quotation</div></div>
                     <% } %>
                   </td>
+                  <% if(canCreateSalesOrder){ %>
                   <td style="text-align:center;">
                     <% if(canConvertQuotation(item)){ %>
                       <div class="tooltip-wrapper" onclick="convertQuotationToSalesOrder(<%= item.quotation_id %>)"><i class="material-icons" style="color:#2878eb;">playlist_add_check</i><div class="tooltip-text">Convert to sales order</div></div>
                     <% } %>
                   </td>
+                  <% } %>
                   <td data-perm="edit" data-perm-cell onclick="editQuotation(<%= item.quotation_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit quotation</div></div>
                   </td>

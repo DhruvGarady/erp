@@ -311,9 +311,20 @@ That stamps `can-<action>` / `cannot-<action>` onto `<body>`. Mark controls decl
 
 ```html
 <input type="button" value="Add UOM" onclick="addUom()" data-perm="create" class="search">
+<th data-perm="edit" width="3%">Edit</th>
 <td data-perm="edit" data-perm-cell onclick="editUom(<%= item.uom_id %>)">
 <button data-perm-save onclick="saveUom()" class="searchButton bg-primary">
 ```
+
+**Tag the `<th>` as well as the `<td>`** — otherwise the cells empty out and the column header is left hanging over a blank strip.
+
+A column gated on a *different* feature cannot use the body class, since that only carries the current page's grants. Wrap those in a template conditional instead and pass the flag in — `quotationinq`'s "Order" column does this, because converting a quotation creates a **sales order**:
+
+```html
+<% if(canCreateSalesOrder){ %><th width="3%">Order</th><% } %>
+```
+
+That drops the column from header and body together, so the counts stay aligned.
 
 **Hiding is done in CSS, not JS** — the inquiry grids replace their whole `innerHTML` on every search and every filter keystroke, so a JS sweep would need re-running after each render and would eventually be missed. A body class outlives all of it.
 

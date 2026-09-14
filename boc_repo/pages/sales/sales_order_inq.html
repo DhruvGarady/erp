@@ -175,9 +175,9 @@
                 <th width="8%">Currency</th>
                 <th width="10%">Grand Total</th>
                 <th width="9%">Delivery</th>
-                <th width="3%">Print</th>
-                <th width="3%">Edit</th>
-                <th width="3%" style="text-align:center;">Del</th>
+                <th data-perm="print" width="3%">Print</th>
+                <th data-perm="edit" width="3%">Edit</th>
+                <th data-perm="delete" width="3%" style="text-align:center;">Del</th>
               </tr>
 
               <%_.each(salesOrders, function(item){ %>
@@ -192,7 +192,7 @@
                   <td><%= item.currency || '' %></td>
                   <td><%= formatAmount(item.grand_total) %></td>
                   <td><%= formatDate(item.delivery_date) %></td>
-                  <td style="text-align:center;">
+                  <td data-perm="print" data-perm-cell style="text-align:center;">
                     <div class="tooltip-wrapper" onclick="printSalesOrder(<%= item.sales_order_id %>)"><i class="material-icons" style="color:#343a40;">print</i><div class="tooltip-text">Print sales order</div></div>
                   </td>
                   <td data-perm="edit" data-perm-cell onclick="editSalesOrder(<%= item.sales_order_id %>)">

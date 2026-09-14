@@ -112,7 +112,8 @@ function renderList(rows) {
     formatDate: formatDate,
     formatAmount: formatAmount,
     canApproveQuotation: canApproveQuotation,
-    canConvertQuotation: canConvertQuotation
+    canConvertQuotation: canConvertQuotation,
+    canCreateSalesOrder: canCreateSalesOrder()
   }));
   filterQuotationTable();
   $("#listContainer2").trigger("create");
@@ -152,11 +153,6 @@ function formatAmount(value) {
   });
 }
 
-function isAdminRole() {
-  var roleName = String(sessionStorage.getItem("ROLE_NAME") || "").toUpperCase();
-  return roleName.indexOf("ADMIN") !== -1;
-}
-
 function isQuotationApproved(item) {
   var status = String(item && item.status ? item.status : "").toUpperCase();
   var approvalStatus = String(item && item.approval_status ? item.approval_status : "").toUpperCase();
@@ -164,11 +160,20 @@ function isQuotationApproved(item) {
 }
 
 function canApproveQuotation(item) {
-  return isAdminRole() && !isQuotationApproved(item);
+  // Was isAdminRole(), a substring test on ROLE_NAME. The can_approve
+  // grant decides now, so a non-admin role can be given approval rights
+  // without being made an administrator.
+  return canDo("approve") && !isQuotationApproved(item);
+}
+
+// Converting creates a SALES ORDER, not a quotation -- so it is gated on
+// the sales-order feature, not this page's own.
+function canCreateSalesOrder() {
+  return canDo("SALES_ORDER", "create");
 }
 
 function canConvertQuotation(item) {
-  return isQuotationApproved(item);
+  return canCreateSalesOrder() && isQuotationApproved(item);
 }
 
 function addQuotation() {
@@ -218,6 +223,8 @@ function deleteQuotation(id) {
 }
 
 function printQuotation(id) {
+  if (!ensurePermission("print", "You do not have permission to print.")) return;
+
   if (!id) return;
 
   $.ajax({
@@ -562,6 +569,8 @@ function numberToWordsIndian(value) {
 }
 
 function approveQuotation(id) {
+  if (!ensurePermission("approve", "You do not have permission to approve quotations.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Approve this quotation?", function () {
@@ -588,6 +597,13 @@ function approveQuotation(id) {
 }
 
 function convertQuotationToSalesOrder(id) {
+  // Cross-feature: this creates a sales order, so it is the SALES_ORDER
+  // grant that applies, not this page's own.
+  if (!canCreateSalesOrder()) {
+    showWarningDialog("You do not have permission to create sales orders.");
+    return;
+  }
+
   if (!id) return;
 
   var summary = _.find(quotationData || [], function (item) {

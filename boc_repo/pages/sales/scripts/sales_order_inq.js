@@ -198,6 +198,8 @@ function deleteSalesOrder(id) {
 }
 
 function printSalesOrder(id) {
+  if (!ensurePermission("print", "You do not have permission to print.")) return;
+
   if (!id) return;
 
   $.ajax({

@@ -1,8 +1,10 @@
-module.exports = function registerInventoryApi({ app, pool, verifyToken, requireRole }) {
-function now() {
-    return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
+const {
+    now,
+    clampListLimit,
+    getNextDocumentNumber
+} = require("./helpers");
 
+module.exports = function registerInventoryApi({ app, pool, verifyToken, requireRole }) {
 //----------------------------------------------------INVENTORY / STOCK MODULE------------------------------------------------
 
 const INVENTORY_WRITE_ROLES = ["ADMIN", "MANAGER", "INVENTORY"];
@@ -22,39 +24,6 @@ pool.query(DOCUMENT_SEQUENCE_TABLE_SQL, (err) => {
         console.error("Unable to ensure document_sequences table:", err);
     }
 });
-
-function clampListLimit(value) {
-    const parsed = parseInt(value || "200", 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) return 200;
-    return Math.min(parsed, 500);
-}
-
-function getNextDocumentNumber(connection, sequenceName, prefix, callback) {
-    const selectSql = "SELECT next_number, padding FROM document_sequences WHERE sequence_name = ? FOR UPDATE";
-
-    connection.query(selectSql, [sequenceName], (selectErr, rows) => {
-        if (selectErr) return callback(selectErr);
-
-        if (!rows.length) {
-            const firstNumber = 1;
-            const insertSql = "INSERT INTO document_sequences (sequence_name, prefix, next_number, padding, updated_at) VALUES (?, ?, ?, ?, ?)";
-
-            return connection.query(insertSql, [sequenceName, prefix, firstNumber + 1, 4, now()], (insertErr) => {
-                if (insertErr) return callback(insertErr);
-                callback(null, `${prefix}-${String(firstNumber).padStart(4, "0")}`);
-            });
-        }
-
-        const currentNumber = Number(rows[0].next_number || 1);
-        const padding = Number(rows[0].padding || 4);
-        const updateSql = "UPDATE document_sequences SET next_number = ?, updated_at = ? WHERE sequence_name = ?";
-
-        connection.query(updateSql, [currentNumber + 1, now(), sequenceName], (updateErr) => {
-            if (updateErr) return callback(updateErr);
-            callback(null, `${prefix}-${String(currentNumber).padStart(padding, "0")}`);
-        });
-    });
-}
 
 function peekNextDocumentNumber(sequenceName, prefix, tableName, numberColumn, pkColumn, callback) {
     const sequenceSql = "SELECT next_number, padding FROM document_sequences WHERE sequence_name = ? LIMIT 1";

@@ -126,21 +126,44 @@ CREATE TABLE features (
  icon VARCHAR(20),
  is_active VARCHAR(50)
  );
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR100','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','DASHBOARD','DASHBOARD','home.html','1','','school','Y');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR101','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','USER MANAGEMENT','USER MANAGEMENT','','2','','manage_accounts','Y');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR102','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','USER (Add/Edit/Del)','USER','usermanagementinq.html','1','TR101','','Y');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR103','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','FACULTY & STAFF','FACULTY & STAFF','faculty_managementinq.html','2','TR101','','N');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR107','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','COMMUNICATION AND NOTIFICATION','COMMUNICATION AND NOTIFICATION','','6','','notifications','Y');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR108','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','DISCUSSION','DISCUSSION','discussioninq.html','1','TR107','','N');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR109','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','ALERTS (Add/Del)','ALERTS','email_alertsinq.html','2','TR107','','Y');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR110','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','MASTER DATA','MASTER DATA','','9','','create_new_folder','Y');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR113','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','COURSES','COURSES','coursemasterinq.html','1','TR110','','Y');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR114','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','SECTIONS','SECTIONS','sectiomasterinq.html','2','TR110','','N');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR115','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','CLUBS','CLUBS','clubmasterinq.html','3','TR110','','N');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR116','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','FESTS','FESTS','festmasterinq.html','4','TR110','','N');
-INSERT INTO features(id,created_by,created_at,updated_by, updated_at, feature_name,feature_description, feature_url,display_sequence, parent_feature_id, icon,is_active) values('TR117','Admin','2025-02-13 00:00:00','Admin','2025-02-13 00:00:00','HOSTEL','HOSTEL','hostelmasterinq.html','5','TR110','','N');
+
+CREATE TABLE roles (
+  role_id INT AUTO_INCREMENT PRIMARY KEY,
+  role_name VARCHAR(50) NOT NULL UNIQUE,
+  role_description VARCHAR(150),
+  is_active VARCHAR(20) DEFAULT 'Y',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE user_roles (
+  user_role_id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  role_id INT NOT NULL,
+  is_active VARCHAR(20) DEFAULT 'Y',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
 
 
+CREATE TABLE role_features (
+  role_feature_id INT AUTO_INCREMENT PRIMARY KEY,
+  role_id INT NOT NULL,
+  feature_id VARCHAR(20) NOT NULL,
+
+  can_view VARCHAR(20) DEFAULT 'N',
+  can_create VARCHAR(20) DEFAULT 'N',
+  can_edit VARCHAR(20) DEFAULT 'N',
+  can_delete VARCHAR(20) DEFAULT 'N',
+  can_approve VARCHAR(20) DEFAULT 'N',
+  can_print VARCHAR(20) DEFAULT 'N',
+
+  is_active VARCHAR(20) DEFAULT 'Y',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uq_role_feature (role_id, feature_id)
+);
 
 CREATE TABLE boc_user (
     user_id INT AUTO_INCREMENT PRIMARY KEY,

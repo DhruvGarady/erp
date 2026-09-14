@@ -1,3 +1,12 @@
+const {
+    now,
+    isBlank,
+    sanitizeMasterPayload,
+    validateMasterPayload,
+    buildWhereClause,
+    withAuditFields
+} = require("./helpers");
+
 module.exports = function registerMasterdataApi({ app, pool, verifyToken, userHasRole, requireRole }) {
 //-------------------------------------MASTER DATA TABLES---------------------------------------------
 
@@ -12,18 +21,9 @@ module.exports = function registerMasterdataApi({ app, pool, verifyToken, userHa
 // DELETE /api/v1/:table/:id   -> soft delete
 // ============================================================
 
-function now() {
-    return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
-
-const AUDIT_FIELDS = ["created_by", "updated_by", "created_at", "updated_at", "is_active"];
 const MASTER_ADMIN_ROLES = ["ADMIN"];
 const MASTER_OPERATIONAL_ROLES = ["ADMIN", "MANAGER"];
 const MASTER_FINANCE_ROLES = ["ADMIN", "FINANCE"];
-
-function withAuditFields(fields) {
-    return Array.from(new Set([...(fields || []), ...AUDIT_FIELDS]));
-}
 
 const MASTER_TABLE_CONFIG = {
     mst_customer: {
@@ -193,15 +193,9 @@ const MASTER_TABLE_CONFIG = {
 };
 
 function getTableConfig(tableName) {
-    return MASTER_TABLE_CONFIG[tableName] || null;
-}
-
-function isBlank(value) {
-    return value === undefined || value === null || String(value).trim() === "";
-}
-
-function isValidActiveFlag(value) {
-    return value === undefined || value === null || value === "" || ["Y", "N"].includes(String(value).toUpperCase());
+    return Object.prototype.hasOwnProperty.call(MASTER_TABLE_CONFIG, tableName)
+        ? MASTER_TABLE_CONFIG[tableName]
+        : null;
 }
 
 function ensureMasterWriteAccess(req, config, res) {
@@ -215,77 +209,6 @@ function ensureMasterWriteAccess(req, config, res) {
 
 function buildColumnList(config) {
     return [config.pk, ...(config.fields || [])].join(", ");
-}
-
-function sanitizeMasterPayload(config, body, isCreate) {
-    const source = body || {};
-    const allowed = new Set(config.fields || []);
-    const payload = {};
-    const unknownFields = [];
-
-    Object.keys(source).forEach((key) => {
-        if (key === config.pk) {
-            return;
-        }
-
-        if (!allowed.has(key)) {
-            unknownFields.push(key);
-            return;
-        }
-
-        payload[key] = source[key];
-    });
-
-    if (unknownFields.length) {
-        return { error: `Unsupported field(s): ${unknownFields.join(", ")}` };
-    }
-
-    const dateNow = now();
-    if (isCreate) {
-        payload.created_at = payload.created_at || dateNow;
-        payload.created_by = payload.created_by || null;
-    }
-
-    payload.updated_at = payload.updated_at || dateNow;
-    payload.updated_by = payload.updated_by || payload.created_by || null;
-    if (isCreate) {
-        payload.is_active = payload.is_active || "Y";
-    }
-
-    return { payload };
-}
-
-function validateMasterPayload(config, payload, isCreate) {
-    const required = config.required || [];
-
-    for (const field of required) {
-        if (isCreate && isBlank(payload[field])) {
-            return `${field} is required`;
-        }
-
-        if (!isCreate && Object.prototype.hasOwnProperty.call(payload, field) && isBlank(payload[field])) {
-            return `${field} cannot be blank`;
-        }
-    }
-
-    if (!isValidActiveFlag(payload.is_active)) {
-        return "is_active must be Y or N";
-    }
-
-    for (const field of (config.numeric || [])) {
-        if (!isBlank(payload[field]) && Number.isNaN(Number(payload[field]))) {
-            return `${field} must be numeric`;
-        }
-    }
-
-    if (Object.prototype.hasOwnProperty.call(payload, "tax_percent")) {
-        const taxPercent = Number(payload.tax_percent);
-        if (!Number.isNaN(taxPercent) && (taxPercent < 0 || taxPercent > 100)) {
-            return "tax_percent must be between 0 and 100";
-        }
-    }
-
-    return null;
 }
 
 function runUniqueChecks(tableName, config, payload, recordId, callback) {
@@ -357,26 +280,6 @@ function checkDeactivateDependencies(config, recordId, callback) {
     next();
 }
 
-function buildWhereClause(tableName, query) {
-    const config = getTableConfig(tableName);
-    const whereParts = [];
-    const values = [];
-
-    if (query.is_active) {
-        whereParts.push("is_active = ?");
-        values.push(query.is_active);
-    }
-
-    if (query.search && config && config.searchable.length > 0) {
-        const searchParts = config.searchable.map(col => `${col} LIKE ?`);
-        whereParts.push(`(${searchParts.join(" OR ")})`);
-        config.searchable.forEach(() => values.push(`%${query.search}%`));
-    }
-
-    const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(" AND ")}` : "";
-    return { whereClause, values };
-}
-
 // ==================================================================
 // 1. GET /api/v1/:table  -> list with pagination and filtering
 // ==================================================================
@@ -392,7 +295,7 @@ app.get("/api/v1/:table", verifyToken, (req, res) => {
     const limit = parseInt(req.query.limit || "10", 10);
     const offset = (page - 1) * limit;
 
-    const { whereClause, values } = buildWhereClause(tableName, req.query);
+    const { whereClause, values } = buildWhereClause(config, req.query);
 
     const countSql = `SELECT COUNT(*) AS total FROM ${tableName} ${whereClause}`;
     const dataSql = `SELECT ${buildColumnList(config)} FROM ${tableName} ${whereClause} ORDER BY ${config.pk} DESC LIMIT ? OFFSET ?`;

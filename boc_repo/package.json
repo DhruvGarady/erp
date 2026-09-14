@@ -6,8 +6,13 @@
   "scripts": {
     "start": "node api.js",
     "dev": "node api.js",
-    "check": "node --check api.js && node --check backend/logger.js && node --check backend/global_api.js && node --check backend/masterdata_api.js && node --check backend/sales_api.js && node --check backend/inventory_api.js && node --check global/global_exp1.js",
-    "test": "npm run check"
+    "check": "node --check api.js && node --check backend/logger.js && node --check backend/auth.js && node --check backend/helpers.js && node --check backend/global_api.js && node --check backend/masterdata_api.js && node --check backend/sales_api.js && node --check backend/inventory_api.js && node --check global/global_exp1.js",
+    "test": "npm run check && node --test \"test/unit/**/*.test.js\" \"test/security/**/*.test.js\" \"test/regression/**/*.test.js\"",
+    "test:unit": "node --test \"test/unit/**/*.test.js\"",
+    "test:security": "node --test \"test/security/**/*.test.js\"",
+    "test:regression": "node --test \"test/regression/**/*.test.js\"",
+    "test:integration": "node --test \"test/integration/**/*.test.js\"",
+    "test:watch": "node --test --watch \"test/unit/**/*.test.js\""
   },
   "keywords": [],
   "author": "",

@@ -7,6 +7,7 @@ const session = require("express-session");
 const path = require("path");
 const { logger, requestLogger, errorLogger } = require("./backend/logger");
 const { createAuthTools } = require("./backend/auth");
+const { createRbac } = require("./backend/rbac");
 
 const app = express();
 const port = parseInt(process.env.PORT || "3000", 10);
@@ -81,7 +82,22 @@ pool.on("connection", () => {
 // ---------------- AUTH MIDDLEWARE ----------------
 const { verifyToken, requireRole, userHasRole } = createAuthTools();
 
-const authTools = { verifyToken, requireRole, userHasRole };
+// ---------------- PERMISSIONS ----------------
+// Feature/action grants resolved from role_features. Warmed at boot so
+// the first authenticated request does not pay for the load; it falls
+// back to loading on demand if the database is not reachable yet.
+const rbac = createRbac({ pool });
+
+rbac.refresh((err) => {
+    if (err) {
+        logger.warn("Could not preload permissions; will load on first use", { error: err.message });
+        return;
+    }
+
+    logger.info("Permissions loaded");
+});
+
+const authTools = { verifyToken, requireRole, userHasRole, rbac };
 
 require("./backend/global_api")({ app, pool, ...authTools });
 require("./backend/masterdata_api")({ app, pool, ...authTools });

@@ -32,10 +32,12 @@ Backend uses `function` declarations for helpers, arrow functions only for route
 ### Module contract
 
 ```js
-module.exports = function registerXApi({ app, pool, verifyToken, requireRole }) {
+module.exports = function registerXApi({ app, pool, verifyToken, requireRole, rbac }) {
     // entire file body lives here
 };
 ```
+
+Destructure only what you use. `rbac` carries `requirePermission` — see Permissions below.
 
 Wire it with one line in `api.js` and add it to the `check` script in `package.json`.
 
@@ -79,11 +81,34 @@ API modules use `console.error("<Verb> <route> error:", err)` immediately before
 
 ### Auth
 
-`verifyToken` on every authenticated route; `requireRole([...])` added for writes only. Define `const <MODULE>_WRITE_ROLES = ["ADMIN", "MANAGER", "<DOMAIN>"];` at the top of the module.
+`verifyToken` on every authenticated route.
 
-`req.user` is `{ user_id, username, full_name, role_name }` — no email. Access defensively.
+`req.user` is `{ user_id, username, full_name, role_name, roles }` — no email. `roles` is the array resolved from `user_roles` at login; `role_name` is the legacy single-role column, kept for older tokens. Access defensively.
 
-**House rule: reads are open to any authenticated user, writes are role-gated.** 18 of 26 GET routes have no role check. Know that you're inheriting this.
+### Permissions — prefer `requirePermission` over `requireRole`
+
+```js
+const { FEATURE } = require("./rbac");
+app.post("/quotation/create", verifyToken,
+         rbac.requirePermission(FEATURE.SALES_QUOTATION, "create"), handler);
+```
+
+Actions are `view` / `create` / `edit` / `delete` / `approve` / `print`, mapping to the `can_*` columns on `role_features`. Grants **union across a user's roles** — the most permissive wins.
+
+Two distinct outcomes, and the difference is deliberate:
+
+| Situation | Response |
+|---|---|
+| `features.is_active = 'N'` — module not enabled for this install | **404** — the feature is absent, not forbidden |
+| No `role_features` grant for the action | **403** |
+
+Reference features by the `FEATURE.*` constant, never by raw `TR102` — `features.id` is hand-assigned and will be renumbered. The stable key is `features.feature_code`.
+
+Permissions are cached in process (60s TTL). Call `rbac.invalidate()` after any write to `role_features` or `user_roles`.
+
+`requireRole([...])` still exists and now matches **exactly** — it's fine for genuinely role-shaped checks, but per-feature grants are preferred for anything a customer might want to reconfigure.
+
+**Inherited gap: reads are still open to any authenticated user.** 18 of 26 GET routes have no permission check. Combined with public `/user/register`, that is a live data-exposure path — see the remediation plan. New routes should gate reads with `requirePermission(..., "view")`.
 
 ## Frontend
 
@@ -200,6 +225,14 @@ Menu entries live in the `features` table (`id`, `feature_name`, `feature_url`, 
 
 **13 active menu entries point at pages that don't exist yet** — TR109–TR115 (inventory), TR128–TR129 (purchase), TR130/TR131/TR134/TR136 (admin). They render in the sidebar and 404 on click. That list doubles as the build roadmap.
 
+## Migrations
+
+Schema changes go in `../boc-db/migrations/NNN_name.sql` and are applied with `npm run migrate` (`npm run migrate:status` to preview). Each file runs once inside a transaction and is recorded in `schema_migrations`.
+
+Write them idempotently (`NOT EXISTS` guards, `IF NOT EXISTS`) so a partially-applied install can be re-run safely.
+
+> This exists because `backend/schema_hardening.sql` sat unapplied for months — nothing referenced it, so nobody noticed the indexes were missing. **It is still unapplied.** Its contents belong in a migration.
+
 ## Checklist — adding a module
 
 1. `CREATE TABLE` → `../boc-db/tables.sql`
@@ -207,16 +240,15 @@ Menu entries live in the `features` table (`id`, `feature_name`, `feature_url`, 
 3. If it's a document, seed a `document_sequences` row
 4. API → config block in `MASTER_TABLE_CONFIG`, or a new `backend/<module>_api.js` wired in `api.js` + `package.json` check script
 5. Pages → `<x>_inq.html` + `scripts/<x>_inq.js` (clone `vendorinq`), `<x>_add.html` + `scripts/<x>_add.js` (clone `customer_add`)
-6. Menu → `features` row with next free `TR<nnn>`, mirrored into the CSV
-7. RBAC → `role_features` rows (stored but not yet enforced server-side)
+6. Menu → `features` row with next free `TR<nnn>` AND a `feature_code`; add the code to `FEATURE` in `backend/rbac.js`
+7. RBAC → `role_features` grants per role (enforced — see Permissions above)
 8. Seed → `docs_repo/masterdata/data/<table>_N_records.sql`
 
 ## Known broken — don't copy these patterns
 
 - **`POST /salesorder/create` throws.** `STOCK_RESERVATION_COLUMNS` is used in `sales_api.js:999` but declared inside `registerInventoryApi`'s closure. Each module is its own closure — it never reaches `globalThis`. Define shared column lists locally.
 - **Four routes are unreachable** (`:param` registered before literal): `POST /api/v1/journals`, `GET /api/v1/journals/trial-balance`, `GET /api/v1/periods/current`, `GET /quotation/nextno`.
-- **`requireRole` matches role names by SUBSTRING** (`api.js:123`). Any role containing "ADMIN" — `NONADMIN`, `NOT_ADMIN`, `READONLY_ADMIN` — passes `requireRole(["ADMIN"])`. Roles are user-creatable via the admin UI, so this is a live privilege-escalation path. Use exact matching.
-- **RBAC is wired but inert.** `/auth/login` reads only the legacy `boc_user.role_name` and never consults `user_roles`, so multi-role assignment does nothing. `role_features` is empty and never joined when building the menu — every authenticated user sees every feature.
+- **`/feature/getFeature` used to return every feature to everyone** and had no error response at all. Both fixed — see RBAC below.
 - **`/auth/login` falls back to plaintext password comparison** (`global_api.js:1213`) when the stored hash doesn't start with `$2`. Intended as a legacy-upgrade path; it means a non-bcrypt `password_hash` authenticates by string equality. Live data is all bcrypt today.
 - **The master-table whitelist reads the prototype chain.** `getTableConfig` is `MASTER_TABLE_CONFIG[tableName] || null`, so `/api/v1/constructor` (also `__proto__`, `toString`, `hasOwnProperty`) gets past the "Invalid table name" 400 and reaches a SQL identifier position. Fix is `Object.prototype.hasOwnProperty.call`.
 - **`"Request body cannot be empty"` is unreachable.** `sanitizeMasterPayload` always stamps `updated_at`/`updated_by`, so the column list is never empty — an empty PUT is a silent no-op touch.

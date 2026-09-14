@@ -1,117 +1,125 @@
 // ==================================================================
-// VULNERABILITY: requireRole() substring-matches role names.
+// FIXED: requireRole() matches role names exactly.
 //
-// Source: backend/auth.js, userHasRole() - the code moved verbatim out of
-// api.js:111-124.
+// Source: backend/auth.js, userHasRole().
 //
-//     return roles.some((role) => userRole === role || userRole.indexOf(role) !== -1);
-//                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+// This file previously documented a live privilege-escalation hole. The
+// check used to be:
 //
-// The second arm passes when the user's role merely CONTAINS an allowed role
-// as a substring. requireRole(["ADMIN"]) therefore admits "SALES_ADMIN",
-// "NONADMIN", "READONLY_ADMIN" and anything else with those five letters in
-// it. requireRole(["ADMIN","MANAGER","SALES"]) admits "AREA_MANAGER" and
-// "PRESALES".
+//     roles.some((role) => userRole === role || userRole.indexOf(role) !== -1);
+//                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 //
-// Why it is reachable: role names are free text. POST /roles/create
-// (backend/global_api.js) stores whatever string an admin types, boc_user
-// .role_name is a VARCHAR, and that string is copied into the JWT at login
-// and read straight back out here. Creating a role called "NONADMIN" - which
-// reads like the opposite of admin - silently grants admin-level write access
-// to every master table and every sales/inventory document.
+// The second arm passed when the user's role merely CONTAINED an allowed
+// role, so requireRole(["ADMIN"]) admitted "SALES_ADMIN", "NONADMIN" and
+// "READONLY_ADMIN". Role names are free text typed into POST /roles/create,
+// so naming a role "READONLY_ADMIN" to RESTRICT someone silently made them
+// a full administrator.
 //
-// Fix (one line, no other change needed):
-//     return roles.includes(userRole);
+// It is now `held.some(userRole => roles.includes(userRole))`.
 //
-// The tests below are in two halves:
-//   1. "current behaviour" - passing tests that pin the hole so it cannot
-//      widen unnoticed. Delete them together with the bug.
-//   2. "required behaviour" - { todo } tests that assert what the code SHOULD
-//      do. They fail today, are reported as TODO rather than as failures, and
-//      turn green the moment the one-line fix lands.
+// These tests are kept -- not deleted -- because nothing else stops the
+// substring form being reintroduced by someone "fixing" multi-role support.
+// Every assertion below fails loudly if the match ever loosens again.
 // ==================================================================
 
 const { describe, test } = require("node:test");
 const assert = require("node:assert");
 
-const { createTestAuth, user } = require("../helpers/auth-fixtures");
-const { createFakeReq, createFakeRes } = require("../helpers/fake-app");
+const { createAuthTools } = require("../../backend/auth");
 
-const { requireRole } = createTestAuth();
+const { userHasRole } = createAuthTools();
 
-// Role names an admin could plausibly create in this ERP, none of which is
-// meant to be an administrator.
-const NON_ADMIN_ROLES_THAT_CONTAIN_ADMIN = ["SALES_ADMIN", "NONADMIN", "READONLY_ADMIN", "ADMINISTRATIVE_ASSISTANT", "EX_ADMIN"];
-
-function isAllowed(allowedRoles, roleName) {
-    const req = createFakeReq({ user: user(roleName) });
-    const res = createFakeRes();
-    let allowed = false;
-
-    requireRole(allowedRoles)(req, res, () => {
-        allowed = true;
-    });
-
-    return { allowed, statusCode: res.statusCode, body: res.body };
+function withRole(roleName) {
+    return { user: { role_name: roleName } };
 }
 
-describe("VULN: role substring match - current behaviour", () => {
-    test("SALES_ADMIN passes requireRole([\"ADMIN\"]) today", () => {
-        // TODO: remove once userHasRole compares exactly. This is the bug.
-        assert.equal(isAllowed(["ADMIN"], "SALES_ADMIN").allowed, true);
+function withRoles(roles) {
+    return { user: { roles } };
+}
+
+describe("requireRole matches exactly, never by substring", () => {
+    test("the role that is named is the role that passes", () => {
+        assert.equal(userHasRole(withRole("ADMIN"), ["ADMIN"]), true);
+        assert.equal(userHasRole(withRole("SALES"), ["ADMIN", "MANAGER", "SALES"]), true);
     });
 
-    test("NONADMIN passes requireRole([\"ADMIN\"]) today", () => {
-        // TODO: remove once userHasRole compares exactly. This is the bug.
-        assert.equal(isAllowed(["ADMIN"], "NONADMIN").allowed, true);
-    });
+    test("a role merely containing ADMIN is not an administrator", () => {
+        const impostors = [
+            "NONADMIN",
+            "NON-ADMIN",
+            "NOT_ADMIN",
+            "READONLY_ADMIN",
+            "ADMIN_READONLY",
+            "SALES_ADMIN",
+            "SUBADMIN",
+            "SUPERADMIN",
+            "EX-ADMIN",
+            "Junior Admin",
+            "ADMINISTRATIVE ASSISTANT",
+            "admin_denied"
+        ];
 
-    test("every ADMIN-containing role name is currently an administrator", () => {
-        // TODO: remove once userHasRole compares exactly. This is the bug.
-        NON_ADMIN_ROLES_THAT_CONTAIN_ADMIN.forEach((roleName) => {
-            assert.equal(isAllowed(["ADMIN"], roleName).allowed, true, `${roleName} unexpectedly denied`);
+        impostors.forEach((roleName) => {
+            assert.equal(
+                userHasRole(withRole(roleName), ["ADMIN"]),
+                false,
+                `"${roleName}" must not satisfy requireRole(["ADMIN"])`
+            );
         });
     });
 
-    test("the same hole exists for MANAGER and SALES in the write-role lists", () => {
-        // TODO: remove once userHasRole compares exactly. This is the bug.
-        assert.equal(isAllowed(["ADMIN", "MANAGER", "SALES"], "AREA_MANAGER").allowed, true);
-        assert.equal(isAllowed(["ADMIN", "MANAGER", "SALES"], "PRESALES").allowed, true);
-        assert.equal(isAllowed(["ADMIN", "MANAGER", "INVENTORY"], "INVENTORY_VIEWER").allowed, true);
+    test("the same hole stays closed for the module write-role lists", () => {
+        const salesWrite = ["ADMIN", "MANAGER", "SALES"];
+        const inventoryWrite = ["ADMIN", "MANAGER", "INVENTORY"];
+
+        assert.equal(userHasRole(withRole("AREA_MANAGER"), salesWrite), false);
+        assert.equal(userHasRole(withRole("ASSISTANT MANAGER"), salesWrite), false);
+        assert.equal(userHasRole(withRole("NON-MANAGER"), salesWrite), false);
+        assert.equal(userHasRole(withRole("PRESALES"), salesWrite), false);
+        assert.equal(userHasRole(withRole("WHOLESALES"), salesWrite), false);
+        assert.equal(userHasRole(withRole("INVENTORY CLERK (READ ONLY)"), inventoryWrite), false);
     });
 
-    test("a role that shares no substring is still correctly denied", () => {
-        // The guard rail that does work today - make sure a fix keeps it.
-        const denied = isAllowed(["ADMIN"], "FINANCE");
-
-        assert.equal(denied.allowed, false);
-        assert.equal(denied.statusCode, 403);
+    test("case and surrounding whitespace are still normalized", () => {
+        assert.equal(userHasRole(withRole("admin"), ["ADMIN"]), true);
+        assert.equal(userHasRole(withRole("  Admin  "), ["ADMIN"]), true);
+        assert.equal(userHasRole(withRole("ADMIN"), ["admin"]), true);
     });
 });
 
-describe("VULN: role substring match - required behaviour", () => {
-    test("requireRole([\"ADMIN\"]) must reject SALES_ADMIN", { todo: "userHasRole() substring-matches; fix is roles.includes(userRole) in backend/auth.js" }, () => {
-        const result = isAllowed(["ADMIN"], "SALES_ADMIN");
-
-        assert.equal(result.allowed, false);
-        assert.equal(result.statusCode, 403);
-        assert.deepEqual(result.body, { error: "Access denied. Insufficient role permission" });
+describe("requireRole reads the multi-role claim", () => {
+    test("any single held role satisfying the list is enough", () => {
+        assert.equal(userHasRole(withRoles(["VIEWER", "SALES"]), ["SALES"]), true);
+        assert.equal(userHasRole(withRoles(["VIEWER", "USER"]), ["SALES"]), false);
     });
 
-    test("requireRole([\"ADMIN\"]) must reject NONADMIN", { todo: "userHasRole() substring-matches; fix is roles.includes(userRole) in backend/auth.js" }, () => {
-        assert.equal(isAllowed(["ADMIN"], "NONADMIN").allowed, false);
+    test("the roles array wins over the legacy role_name when present", () => {
+        const req = { user: { role_name: "ADMIN", roles: ["VIEWER"] } };
+        assert.equal(userHasRole(req, ["ADMIN"]), false);
+        assert.equal(userHasRole(req, ["VIEWER"]), true);
     });
 
-    test("no role name other than ADMIN itself may satisfy requireRole([\"ADMIN\"])", { todo: "userHasRole() substring-matches; fix is roles.includes(userRole) in backend/auth.js" }, () => {
-        NON_ADMIN_ROLES_THAT_CONTAIN_ADMIN.forEach((roleName) => {
-            assert.equal(isAllowed(["ADMIN"], roleName).allowed, false, `${roleName} must not be an administrator`);
-        });
-
-        assert.equal(isAllowed(["ADMIN"], "ADMIN").allowed, true, "the real ADMIN role must still pass");
+    test("an empty roles array falls back to the legacy claim", () => {
+        const req = { user: { role_name: "ADMIN", roles: [] } };
+        assert.equal(userHasRole(req, ["ADMIN"]), true);
     });
 
-    test("sales write roles must not admit AREA_MANAGER or PRESALES", { todo: "userHasRole() substring-matches; fix is roles.includes(userRole) in backend/auth.js" }, () => {
-        assert.equal(isAllowed(["ADMIN", "MANAGER", "SALES"], "AREA_MANAGER").allowed, false);
-        assert.equal(isAllowed(["ADMIN", "MANAGER", "SALES"], "PRESALES").allowed, false);
+    test("substring matching is not reintroduced through the array", () => {
+        assert.equal(userHasRole(withRoles(["SALES_ADMIN"]), ["ADMIN"]), false);
+        assert.equal(userHasRole(withRoles(["NONADMIN", "VIEWER"]), ["ADMIN"]), false);
+    });
+});
+
+describe("requireRole fails closed", () => {
+    test("a request with no user is denied", () => {
+        assert.equal(userHasRole({}, ["ADMIN"]), false);
+        assert.equal(userHasRole({ user: {} }, ["ADMIN"]), false);
+        assert.equal(userHasRole({ user: { role_name: "" } }, ["ADMIN"]), false);
+    });
+
+    test("an empty allowed-roles list still means 'any authenticated user'", () => {
+        // Not a bug, but it is load-bearing: no route passes [] today, and
+        // this pins the meaning so nobody assumes [] means "nobody".
+        assert.equal(userHasRole(withRole("VIEWER"), []), true);
     });
 });

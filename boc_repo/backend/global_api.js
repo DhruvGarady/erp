@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer");
 const { now, toIntOrNull, normalizeYN, getListLimit } = require("./helpers");
 
-module.exports = function registerGlobalApi({ app, pool, verifyToken, requireRole }) {
+module.exports = function registerGlobalApi({ app, pool, verifyToken, requireRole, rbac }) {
 //----------------------------------------------------USER TABLE------------------------------------------------
     const saltRounds = 10;
     const ACCESS_ADMIN_ROLES = ["ADMIN"];
@@ -1192,40 +1192,61 @@ app.post("/auth/login", (req, res) => {
                 }
             }
 
-            const token = jwt.sign(
-                {
+            // Resolve every role assigned through user_roles. Before this,
+            // login read only boc_user.role_name, so assigning a second role
+            // through the admin screens had no effect at runtime.
+            //
+            // The legacy column is unioned in rather than replaced: it is
+            // still the only role some older accounts have, and dropping it
+            // here would silently revoke their access.
+            return rbac.getUserRoles(user.user_id, (roleErr, assignedRoles) => {
+                if (roleErr) {
+                    console.error("Resolve user roles error:", roleErr);
+                    return res.status(500).json({ error: "Login failed" });
+                }
+
+                const roles = rbac.rolesFromUser({
+                    roles: (assignedRoles || []).concat(user.role_name || [])
+                });
+
+                const token = jwt.sign(
+                    {
+                        user_id: user.user_id,
+                        username: user.username,
+                        full_name: user.full_name,
+                        role_name: user.role_name,
+                        roles: roles
+                    },
+                    process.env.JWT_SECRET,
+                    { expiresIn: "8h" }
+                );
+
+                const userPayload = {
                     user_id: user.user_id,
                     username: user.username,
                     full_name: user.full_name,
-                    role_name: user.role_name
-                },
-                process.env.JWT_SECRET,
-                { expiresIn: "8h" }
-            );
+                    email: user.email,
+                    role_name: user.role_name,
+                    roles: roles
+                };
 
-            const userPayload = {
-                user_id: user.user_id,
-                username: user.username,
-                full_name: user.full_name,
-                email: user.email,
-                role_name: user.role_name
-            };
+                if (req.session) {
+                    req.session.USER_ID = user.user_id;
+                    req.session.USERNAME = user.username;
+                    req.session.ROLE_NAME = user.role_name || "User";
+                }
 
-            if (req.session) {
-                req.session.USER_ID = user.user_id;
-                req.session.USERNAME = user.username;
-                req.session.ROLE_NAME = user.role_name || "User";
-            }
-
-            return res.json({
-                success: true,
-                token: token,
-                user: userPayload,
-                user_id: userPayload.user_id,
-                username: userPayload.username,
-                full_name: userPayload.full_name,
-                email: userPayload.email,
-                role_name: userPayload.role_name
+                return res.json({
+                    success: true,
+                    token: token,
+                    user: userPayload,
+                    user_id: userPayload.user_id,
+                    username: userPayload.username,
+                    full_name: userPayload.full_name,
+                    email: userPayload.email,
+                    role_name: userPayload.role_name,
+                    roles: roles
+                });
             });
         } catch (compareErr) {
             console.error("Password compare error:", compareErr);
@@ -1730,15 +1751,23 @@ app.post("/auth/create-user", verifyToken, requireRole(["ADMIN"]), async (req, r
     }
 });
 
-app.get('/feature/getFeature', verifyToken, (req,res) => {
-
- pool.query('SELECT `id`, `feature_name`, `feature_description`, `feature_url`, `display_sequence`, `parent_feature_id`, `icon` FROM features WHERE is_active = "Y"', 
-(err, result) => {
-        if(err){
-            console.log(err)
-        }else{
-			res.json(result);
+// Builds the sidebar. Returns only the features the caller's roles may
+// view, so a user is never shown a menu entry that 403s when clicked,
+// and a module disabled for this install disappears entirely.
+//
+// This previously returned every active feature to every authenticated
+// user, with role_features never joined -- so the whole permission
+// model was administered but had no effect on what anyone could see.
+// It also had no error response at all: on a database error the request
+// hung until the client timed out, holding the socket open.
+app.get("/feature/getFeature", verifyToken, (req, res) => {
+    rbac.getVisibleFeatures(rbac.rolesFromUser(req.user), (err, features) => {
+        if (err) {
+            console.error("GET /feature/getFeature error:", err);
+            return res.status(500).json({ error: "Failed to fetch features" });
         }
-    })
-})
+
+        return res.json(features);
+    });
+});
 };

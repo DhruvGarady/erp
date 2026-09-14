@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_PAYMENT_TERMS");
   paymentTermsTemplate = $("#listTmpl").html();
   paymentTerms = [];
   $("#paymentTermsTableSearch").on("input", filterPaymentTermsTable);
@@ -102,15 +103,21 @@ function filterPaymentTermsTable() {
 }
 
 function addPaymentTerms() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "payment_terms_add.html";
 }
 
 function editPaymentTerms(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "payment_terms_add.html?id=" + id;
 }
 
 function deletePaymentTerms(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate these payment terms?", function () {

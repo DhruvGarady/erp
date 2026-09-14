@@ -294,6 +294,118 @@ describe("rbac fails closed", () => {
     });
 });
 
+describe("rbac.getVisibleFeatures - what the sidebar and pages receive", () => {
+    const FEATURE_ROWS_SQL = /SELECT id, feature_code, feature_name/i;
+
+    function buildWithFeatures(grants, featureRows) {
+        const pool = createFakePool({
+            responses: [
+                { match: PERMISSION_SQL, rows: grants },
+                { match: FEATURE_ROWS_SQL, rows: featureRows },
+                {
+                    match: ACTIVE_FEATURE_SQL,
+                    rows: featureRows.map(row => ({ feature_code: row.feature_code }))
+                }
+            ]
+        });
+
+        return createRbac({ pool });
+    }
+
+    const ROWS = [
+        { id: "TR116", feature_code: "MASTERDATA", feature_name: "MASTER DATA", feature_url: "", parent_feature_id: "", display_sequence: 9, icon: "folder" },
+        { id: "TR124", feature_code: "MST_UOM", feature_name: "UOM", feature_url: "/pages/masterdata/uominq.html", parent_feature_id: "TR116", display_sequence: 8, icon: "" },
+        { id: "TR123", feature_code: "MST_TAX", feature_name: "TAX", feature_url: "/pages/masterdata/taxinq.html", parent_feature_id: "TR116", display_sequence: 7, icon: "" }
+    ];
+
+    function visible(rbac, roles) {
+        return new Promise((resolve, reject) => {
+            rbac.getVisibleFeatures(roles, (err, rows) => (err ? reject(err) : resolve(rows)));
+        });
+    }
+
+    test("only features the role may view come back", async () => {
+        const rbac = buildWithFeatures([
+            grantRow("SALES", "MASTERDATA", ["view"]),
+            grantRow("SALES", "MST_UOM", ["view"])
+        ], ROWS);
+
+        const rows = await visible(rbac, ["SALES"]);
+
+        assert.deepEqual(rows.map(r => r.feature_code).sort(), ["MASTERDATA", "MST_UOM"]);
+    });
+
+    test("each row carries its effective action grants", async () => {
+        const rbac = buildWithFeatures([
+            grantRow("SALES", "MASTERDATA", ["view"]),
+            grantRow("SALES", "MST_UOM", ["view", "print"])
+        ], ROWS);
+
+        const rows = await visible(rbac, ["SALES"]);
+        const uom = rows.find(r => r.feature_code === "MST_UOM");
+
+        assert.deepEqual(uom.permissions, {
+            view: true,
+            create: false,
+            edit: false,
+            delete: false,
+            approve: false,
+            print: true
+        });
+    });
+
+    test("grants union across roles in the payload too", async () => {
+        const rbac = buildWithFeatures([
+            grantRow("VIEWER", "MASTERDATA", ["view"]),
+            grantRow("VIEWER", "MST_UOM", ["view"]),
+            grantRow("MANAGER", "MST_UOM", ["view", "create", "edit"])
+        ], ROWS);
+
+        const rows = await visible(rbac, ["VIEWER", "MANAGER"]);
+        const uom = rows.find(r => r.feature_code === "MST_UOM");
+
+        assert.equal(uom.permissions.create, true);
+        assert.equal(uom.permissions.edit, true);
+        assert.equal(uom.permissions.delete, false);
+    });
+
+    test("the fields buildFeatureTree needs are preserved", async () => {
+        // The sidebar template reads these directly. Dropping any one of
+        // them silently empties the menu.
+        const rbac = buildWithFeatures([
+            grantRow("ADMIN", "MASTERDATA", ["view"]),
+            grantRow("ADMIN", "MST_UOM", ["view"])
+        ], ROWS);
+
+        const rows = await visible(rbac, ["ADMIN"]);
+
+        ["id", "feature_name", "feature_url", "display_sequence", "parent_feature_id", "icon"].forEach((field) => {
+            assert.ok(field in rows[0], `getVisibleFeatures must keep ${field} for buildFeatureTree`);
+        });
+    });
+
+    test("a group whose children are all hidden is dropped", async () => {
+        // MASTERDATA is a parent node with no URL of its own. Returning it
+        // with nothing under it renders an empty, unclickable menu group.
+        const rbac = buildWithFeatures([grantRow("SALES", "MASTERDATA", ["view"])], ROWS);
+
+        const rows = await visible(rbac, ["SALES"]);
+
+        assert.deepEqual(rows, []);
+    });
+
+    test("a group is kept when at least one child survives", async () => {
+        const rbac = buildWithFeatures([
+            grantRow("SALES", "MASTERDATA", ["view"]),
+            grantRow("SALES", "MST_TAX", ["view"])
+        ], ROWS);
+
+        const rows = await visible(rbac, ["SALES"]);
+
+        assert.deepEqual(rows.map(r => r.feature_code).sort(), ["MASTERDATA", "MST_TAX"]);
+    });
+});
+
 describe("rbac.getUserRoles", () => {
     test("returns the roles assigned through user_roles, normalized", async () => {
         const { rbac } = buildRbac({

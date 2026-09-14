@@ -5,6 +5,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_WAREHOUSE");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editWarehouseId = params.get("id");
 

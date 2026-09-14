@@ -5,6 +5,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_CUSTOMER");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editCustomerId = params.get("id");
 

@@ -143,7 +143,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Quote" onclick="addQuotation()" class="search">
+                <input type="button" value="Add Quote" onclick="addQuotation()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new quotation</div>
               </div>
             </td>
@@ -204,10 +204,10 @@
                       <div class="tooltip-wrapper" onclick="convertQuotationToSalesOrder(<%= item.quotation_id %>)"><i class="material-icons" style="color:#2878eb;">playlist_add_check</i><div class="tooltip-text">Convert to sales order</div></div>
                     <% } %>
                   </td>
-                  <td onclick="editQuotation(<%= item.quotation_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editQuotation(<%= item.quotation_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit quotation</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteQuotation(<%= item.quotation_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deleteQuotation(<%= item.quotation_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

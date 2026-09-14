@@ -123,7 +123,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Category" onclick="addCategory()" class="search">
+                <input type="button" value="Add Category" onclick="addCategory()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new material category</div>
               </div>
             </td>
@@ -156,10 +156,10 @@
                   <td><%= item.material_group_name || '' %></td>
                   <td><%= item.description || '' %></td>
                   <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editCategory(<%= item.material_group_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editCategory(<%= item.material_group_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit Category</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteCategory(<%= item.material_group_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deleteCategory(<%= item.material_group_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

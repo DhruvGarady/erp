@@ -11,6 +11,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_MATERIAL");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editMaterialId = params.get("id");
 

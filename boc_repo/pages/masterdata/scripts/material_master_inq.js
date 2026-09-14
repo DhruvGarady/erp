@@ -8,6 +8,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_MATERIAL");
   materialTemplate = $("#listTmpl").html();
   materials = [];
   $("#materialTableSearch").on("input", filterMaterialTable);
@@ -166,15 +167,21 @@ function filterMaterialTable() {
 }
 
 function addMaterial() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "material_master_add.html";
 }
 
 function editMaterial(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "material_master_add.html?id=" + id;
 }
 
 function deleteMaterial(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this material?", function () {

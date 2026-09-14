@@ -123,7 +123,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Currency" onclick="addCurrency()" class="search">
+                <input type="button" value="Add Currency" onclick="addCurrency()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new currency</div>
               </div>
             </td>
@@ -158,10 +158,10 @@
                   <td><%= item.currency_symbol || '' %></td>
                   <td><%= item.description || '' %></td>
                   <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editCurrency(<%= item.currency_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editCurrency(<%= item.currency_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit Currency</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteCurrency(<%= item.currency_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deleteCurrency(<%= item.currency_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

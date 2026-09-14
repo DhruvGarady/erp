@@ -20,6 +20,7 @@ $(document).ready(function () {
   isUserLoggedIn();
   buildMenu();
   setUsrName();
+  setPageFeature("MASTERDATA");
   refreshDashboard();
 });
 

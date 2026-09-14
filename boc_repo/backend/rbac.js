@@ -289,9 +289,26 @@ function createRbac(options) {
         });
     }
 
+    // Returns the effective grants for one feature, as a flat object the
+    // browser can consume directly.
+    function permissionsFor(roles, featureCode) {
+        const effective = {};
+
+        Object.keys(ACTIONS).forEach((action) => {
+            effective[action] = can(roles, featureCode, action);
+        });
+
+        return effective;
+    }
+
     // The sidebar. Returns only features the roles may view, so a user
     // never sees a menu entry leading to a 403 -- and a disabled module
     // disappears for everyone.
+    //
+    // Each row also carries its effective permissions, so the pages can
+    // hide the actions the user cannot perform without a second request.
+    // That is presentation only: every one of these is re-checked
+    // server-side by requirePermission.
     function getVisibleFeatures(roles, callback) {
         ensureLoaded((err) => {
             if (err) return callback(err);
@@ -308,7 +325,12 @@ function createRbac(options) {
                 if (queryErr) return callback(queryErr);
 
                 const normalized = rolesFromUser({ roles });
-                const visible = rows.filter(row => can(normalized, row.feature_code, "view"));
+
+                const visible = rows
+                    .filter(row => can(normalized, row.feature_code, "view"))
+                    .map(row => Object.assign({}, row, {
+                        permissions: permissionsFor(normalized, row.feature_code)
+                    }));
 
                 // A group node with no visible children is noise -- drop it.
                 const withParent = new Set(
@@ -332,6 +354,7 @@ function createRbac(options) {
         isFeatureEnabled,
         getUserRoles,
         getVisibleFeatures,
+        permissionsFor,
         refresh,
         invalidate,
         rolesFromUser

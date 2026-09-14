@@ -123,7 +123,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add UOM" onclick="addUom()" class="search">
+                <input type="button" value="Add UOM" onclick="addUom()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new UOM</div>
               </div>
             </td>
@@ -156,10 +156,10 @@
                   <td><%= item.uom_name || '' %></td>
                   <td><%= item.description || '' %></td>
                   <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editUom(<%= item.uom_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editUom(<%= item.uom_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit UOM</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteUom(<%= item.uom_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deleteUom(<%= item.uom_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

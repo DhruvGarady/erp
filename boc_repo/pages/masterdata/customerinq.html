@@ -124,7 +124,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Customer" onclick="addCustomer()" class="search">
+                <input type="button" value="Add Customer" onclick="addCustomer()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new customer</div>
               </div>
             </td>
@@ -169,10 +169,10 @@
                   <td><%= item.city || '' %></td>
                   <td><%= item.state || '' %></td>
                   <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editCustomer(<%= item.customer_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editCustomer(<%= item.customer_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit Customer</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteCustomer(<%= item.customer_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deleteCustomer(<%= item.customer_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

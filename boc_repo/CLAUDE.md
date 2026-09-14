@@ -287,3 +287,47 @@ Unbuilt per `docs_repo/masterdata and accounts.docx`: Invoice, Purchase Requisit
 `DB_USER` must match an actual MySQL account. On this machine the account is `dhruv`, not `root` — `root@localhost` uses the `auth_socket` plugin, so any password set for it is ignored and rejected with `ER_ACCESS_DENIED_NO_PASSWORD_ERROR`.
 
 Note the failure is non-obvious: the server still binds port 3000 and logs `Server running`, because the pool connects lazily. Bad DB credentials surface only as per-query errors.
+
+## Frontend permissions
+
+`/feature/getFeature` returns only the features the user's roles may view, each carrying its grants:
+
+```json
+{ "feature_code": "MST_UOM",
+  "permissions": { "view": true, "create": false, "edit": true,
+                   "delete": false, "approve": false, "print": true } }
+```
+
+`global_exp1.js` caches these flat in `sessionStorage.FEATURE_PERMISSIONS` and the menu tree in `FEATURES` (unchanged shape — `buildFeatureTree` still works).
+
+**Every page declares its feature**, right after `setUsrName()`:
+
+```js
+setPageFeature("MST_UOM");
+applyRecordPermissions();   // _add pages only
+```
+
+That stamps `can-<action>` / `cannot-<action>` onto `<body>`. Mark controls declaratively:
+
+```html
+<input type="button" value="Add UOM" onclick="addUom()" data-perm="create" class="search">
+<td data-perm="edit" data-perm-cell onclick="editUom(<%= item.uom_id %>)">
+<button data-perm-save onclick="saveUom()" class="searchButton bg-primary">
+```
+
+**Hiding is done in CSS, not JS** — the inquiry grids replace their whole `innerHTML` on every search and every filter keystroke, so a JS sweep would need re-running after each render and would eventually be missed. A body class outlives all of it.
+
+`_add` pages double as edit screens, so Save means create or edit depending on `?id=`. `applyRecordPermissions()` works that out and sets `perm-readonly`, which greys the fields and hides Save while still letting the record be read.
+
+Handlers also guard themselves — a hidden button is still reachable from the console:
+
+```js
+function deleteUom(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+  ...
+}
+```
+
+**All of this is cosmetic.** `requirePermission()` on the route is what actually enforces access; the frontend only removes controls the user cannot use.
+
+Helpers: `canDo(action)` / `canDo(featureCode, action)`, `ensurePermission(action, message)`, `getPageFeature()`, `refreshFeaturePermissions(cb)` (re-pulls grants without a re-login — call it after editing `role_features`).

@@ -132,7 +132,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Warehouse" onclick="addWarehouse()" class="search">
+                <input type="button" value="Add Warehouse" onclick="addWarehouse()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new warehouse</div>
               </div>
             </td>
@@ -171,10 +171,10 @@
                   <td><%= item.phone || '' %></td>
                   <td><%= item.city || '' %></td>
                   <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editWarehouse(<%= item.warehouse_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editWarehouse(<%= item.warehouse_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit warehouse</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteWarehouse(<%= item.warehouse_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deleteWarehouse(<%= item.warehouse_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

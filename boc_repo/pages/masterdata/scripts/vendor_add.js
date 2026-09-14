@@ -5,6 +5,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_VENDOR");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editVendorId = params.get("id");
 

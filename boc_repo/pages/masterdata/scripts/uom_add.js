@@ -5,6 +5,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_UOM");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editUomId = params.get("id");
 

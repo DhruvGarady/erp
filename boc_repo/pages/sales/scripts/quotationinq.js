@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("SALES_QUOTATION");
   quotationTemplate = $("#listTmpl").html();
   quotationData = [];
   $("#quotationTableSearch").on("input", filterQuotationTable);
@@ -171,15 +172,21 @@ function canConvertQuotation(item) {
 }
 
 function addQuotation() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "quotation_add.html";
 }
 
 function editQuotation(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "quotation_add.html?id=" + id;
 }
 
 function deleteQuotation(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this quotation?", function () {

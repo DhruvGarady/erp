@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_MATERIAL_GROUP");
   categoryTemplate = $("#listTmpl").html();
   categories = [];
   $("#categoryTableSearch").on("input", filterCategoryTable);
@@ -102,15 +103,21 @@ function filterCategoryTable() {
 }
 
 function addCategory() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "material_category_add.html";
 }
 
 function editCategory(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "material_category_add.html?id=" + id;
 }
 
 function deleteCategory(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this material category?", function () {

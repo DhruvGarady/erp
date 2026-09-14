@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("SALES_ORDER");
   salesOrderTemplate = $("#listTmpl").html();
   salesOrderData = [];
   $("#salesOrderTableSearch").on("input", filterSalesOrderTable);
@@ -151,15 +152,21 @@ function formatAmount(value) {
 }
 
 function addSalesOrder() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "salesorder_add.html";
 }
 
 function editSalesOrder(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "salesorder_add.html?id=" + id;
 }
 
 function deleteSalesOrder(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this sales order?", function () {

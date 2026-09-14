@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer");
+const { now, toIntOrNull, normalizeYN, getListLimit } = require("./helpers");
 
 module.exports = function registerGlobalApi({ app, pool, verifyToken, requireRole }) {
 //----------------------------------------------------USER TABLE------------------------------------------------
@@ -7,10 +8,6 @@ module.exports = function registerGlobalApi({ app, pool, verifyToken, requireRol
     const ACCESS_ADMIN_ROLES = ["ADMIN"];
 
 const jwt = require("jsonwebtoken");
-
-function now() {
-    return new Date().toISOString().slice(0, 19).replace("T", " ");
-}
 
 function getEmailTransporter() {
     return nodemailer.createTransport({
@@ -124,43 +121,6 @@ function normalizeFrontendBaseUrl(baseUrl) {
             .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
-    }
-
-    function toIntOrNull(value) {
-        if (value === null || value === undefined || value === "") {
-            return null;
-        }
-
-        const parsed = parseInt(value, 10);
-        return Number.isFinite(parsed) ? parsed : null;
-    }
-
-    function normalizeYN(value, defaultValue) {
-        if (value === null || value === undefined || value === "") {
-            return defaultValue;
-        }
-
-        const normalized = String(value).trim().toUpperCase();
-
-        if (["Y", "YES", "TRUE", "1", "ACTIVE"].includes(normalized)) {
-            return "Y";
-        }
-
-        if (["N", "NO", "FALSE", "0", "INACTIVE"].includes(normalized)) {
-            return "N";
-        }
-
-        return defaultValue;
-    }
-
-    function getListLimit(req) {
-        const limit = parseInt(req.query.limit || "500", 10);
-
-        if (!Number.isFinite(limit) || limit <= 0) {
-            return 500;
-        }
-
-        return Math.min(limit, 5000);
     }
 
     function handleDbError(res, label, err) {

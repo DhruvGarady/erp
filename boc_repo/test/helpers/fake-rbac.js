@@ -58,7 +58,10 @@ function createFakeRbac(options) {
     }
 
     function requirePermission(featureCode, action) {
-        return (req, res, next) => {
+        // Tagged so a test can inspect what a route was gated on without
+        // sending a request through it. Route-coverage assertions run at
+        // registration time, before any handler is invoked.
+        const middleware = (req, res, next) => {
             const resolved = typeof featureCode === "function" ? featureCode(req) : featureCode;
 
             calls.push({ feature: resolved, action });
@@ -77,6 +80,15 @@ function createFakeRbac(options) {
 
             next();
         };
+
+        middleware.permission = {
+            feature: typeof featureCode === "function" ? null : featureCode,
+            dynamic: typeof featureCode === "function",
+            resolve: typeof featureCode === "function" ? featureCode : null,
+            action
+        };
+
+        return middleware;
     }
 
     return {

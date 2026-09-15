@@ -6,10 +6,25 @@ const {
     getNextDocumentNumber
 } = require("./helpers");
 
-module.exports = function registerSalesApi({ app, pool, verifyToken, requireRole }) {
+const { FEATURE } = require("./rbac");
+
+module.exports = function registerSalesApi({ app, pool, verifyToken, rbac }) {
 //----------------------------------------------------QUOTATION MODULE------------------------------------------------
 
-const SALES_WRITE_ROLES = ["ADMIN", "MANAGER", "SALES"];
+const { requirePermission } = rbac;
+
+// Read access used to be implicit -- verifyToken and nothing else, so
+// any authenticated user could list every quotation in the system.
+// Reads are now gated on can_view like every other action.
+const canViewQuotation   = requirePermission(FEATURE.SALES_QUOTATION, "view");
+const canCreateQuotation = requirePermission(FEATURE.SALES_QUOTATION, "create");
+const canEditQuotation   = requirePermission(FEATURE.SALES_QUOTATION, "edit");
+const canDeleteQuotation = requirePermission(FEATURE.SALES_QUOTATION, "delete");
+
+const canViewSalesOrder   = requirePermission(FEATURE.SALES_ORDER, "view");
+const canCreateSalesOrder = requirePermission(FEATURE.SALES_ORDER, "create");
+const canEditSalesOrder   = requirePermission(FEATURE.SALES_ORDER, "edit");
+const canDeleteSalesOrder = requirePermission(FEATURE.SALES_ORDER, "delete");
 
 const DOCUMENT_SEQUENCE_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS document_sequences (
@@ -60,7 +75,7 @@ function peekNextDocumentNumber(sequenceName, prefix, tableName, numberColumn, p
 // 1. GET /quotation/list
 //    Returns all active quotations (summary list)
 // ==================================================================
-app.get("/quotation/list", verifyToken, (req, res) => {
+app.get("/quotation/list", verifyToken, canViewQuotation, (req, res) => {
     const values = [];
     const whereParts = ["is_active = 'Y'"];
     const limit = clampListLimit(req.query.limit);
@@ -138,7 +153,7 @@ app.get("/quotation/list", verifyToken, (req, res) => {
 // 2. GET /quotation/:id
 //    Returns full quotation header + items
 // ==================================================================
-app.get("/quotation/:id", verifyToken, (req, res) => {
+app.get("/quotation/:id", verifyToken, canViewQuotation, (req, res) => {
     const quotationId = req.params.id;
 
     const headerSql = `SELECT * FROM quotations WHERE quotation_id = ?`;
@@ -353,7 +368,7 @@ function insertQuotationItems(connection, quotationId, items, dateNow, callback)
 //    Creates quotation header + items in a transaction
 //    Body: { header: {...}, items: [...] }
 // ==================================================================
-app.post("/quotation/create", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
+app.post("/quotation/create", verifyToken, canCreateQuotation, (req, res) => {
     const { header, items } = req.body;
     const dateNow = now();
     const headerRow = buildQuotationHeader(header, dateNow, true);
@@ -421,7 +436,7 @@ app.post("/quotation/create", verifyToken, requireRole(SALES_WRITE_ROLES), (req,
 //    Updates header, soft-deletes old items, inserts fresh items
 //    Body: { header: {...}, items: [...] }
 // ==================================================================
-app.put("/quotation/update/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
+app.put("/quotation/update/:id", verifyToken, canEditQuotation, (req, res) => {
     const quotationId = req.params.id;
     const { header, items } = req.body;
     const dateNow = now();
@@ -489,7 +504,7 @@ app.put("/quotation/update/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (r
 //    Updates only the status field (Draft > Sent > Approved/Rejected)
 //    Body: { status: "Sent", updated_by: 1 }
 // ==================================================================
-app.patch("/quotation/status/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
+app.patch("/quotation/status/:id", verifyToken, canEditQuotation, (req, res) => {
     const quotationId = req.params.id;
     const { status, approval_status, reason, updated_by } = req.body || {};
     const dateNow = now();
@@ -530,7 +545,7 @@ app.patch("/quotation/status/:id", verifyToken, requireRole(SALES_WRITE_ROLES), 
 //    Soft delete â€” sets is_active = 'N' on header (items stay)
 //    Body: { updated_by: 1 }
 // ==================================================================
-app.delete("/quotation/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
+app.delete("/quotation/:id", verifyToken, canDeleteQuotation, (req, res) => {
     const quotationId = req.params.id;
     const { updated_by } = req.body;
     const dateNow = now();
@@ -558,7 +573,7 @@ app.delete("/quotation/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, 
 // 7. GET /quotation/nextno
 //    Returns the next quotation number e.g. QT-0001
 // ==================================================================
-app.get("/quotation/nextno", verifyToken, (req, res) => {
+app.get("/quotation/nextno", verifyToken, canViewQuotation, (req, res) => {
     peekNextDocumentNumber("QUOTATION", "QT", "quotations", "quotation_no", "quotation_id", (err, nextNo) => {
         if (err) {
             console.error("GET /quotation/nextno error:", err);
@@ -1120,7 +1135,7 @@ function handleSalesOrderReservationError(connection, err, fallbackMessage, res)
 // ==================================================================
 // GET /salesorder/list
 // ==================================================================
-app.get("/salesorder/list", verifyToken, (req, res) => {
+app.get("/salesorder/list", verifyToken, canViewSalesOrder, (req, res) => {
     const values = [];
     const whereParts = ["is_active = 'Y'"];
     const limit = clampListLimit(req.query.limit);
@@ -1195,7 +1210,7 @@ app.get("/salesorder/list", verifyToken, (req, res) => {
 // ==================================================================
 // GET /salesorder/nextno
 // ==================================================================
-app.get("/salesorder/nextno", verifyToken, (req, res) => {
+app.get("/salesorder/nextno", verifyToken, canViewSalesOrder, (req, res) => {
     peekNextDocumentNumber("SALES_ORDER", "SO", "sales_orders", "sales_order_no", "sales_order_id", (err, nextNo) => {
         if (err) {
             console.error("GET /salesorder/nextno error:", err);
@@ -1209,7 +1224,7 @@ app.get("/salesorder/nextno", verifyToken, (req, res) => {
 // ==================================================================
 // GET /salesorder/:id
 // ==================================================================
-app.get("/salesorder/:id", verifyToken, (req, res) => {
+app.get("/salesorder/:id", verifyToken, canViewSalesOrder, (req, res) => {
     const salesOrderId = req.params.id;
     const headerSql = `SELECT * FROM sales_orders WHERE sales_order_id = ?`;
     const itemsSql = `SELECT * FROM sales_order_items WHERE sales_order_id = ? AND is_active = 'Y' ORDER BY line_no ASC`;
@@ -1240,7 +1255,7 @@ app.get("/salesorder/:id", verifyToken, (req, res) => {
 // ==================================================================
 // POST /salesorder/create
 // ==================================================================
-app.post("/salesorder/create", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
+app.post("/salesorder/create", verifyToken, canCreateSalesOrder, (req, res) => {
     const { header, items } = req.body;
     const dateNow = now();
     const headerRow = buildSalesOrderHeader(header, dateNow, true);
@@ -1311,7 +1326,7 @@ app.post("/salesorder/create", verifyToken, requireRole(SALES_WRITE_ROLES), (req
 // ==================================================================
 // PUT /salesorder/update/:id
 // ==================================================================
-app.put("/salesorder/update/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
+app.put("/salesorder/update/:id", verifyToken, canEditSalesOrder, (req, res) => {
     const salesOrderId = req.params.id;
     const { header, items } = req.body;
     const dateNow = now();
@@ -1390,7 +1405,7 @@ app.put("/salesorder/update/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (
 // ==================================================================
 // PATCH /salesorder/status/:id
 // ==================================================================
-app.patch("/salesorder/status/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
+app.patch("/salesorder/status/:id", verifyToken, canEditSalesOrder, (req, res) => {
     const salesOrderId = req.params.id;
     const dateNow = now();
     const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;
@@ -1468,7 +1483,7 @@ app.patch("/salesorder/status/:id", verifyToken, requireRole(SALES_WRITE_ROLES),
 // ==================================================================
 // DELETE /salesorder/:id
 // ==================================================================
-app.delete("/salesorder/:id", verifyToken, requireRole(SALES_WRITE_ROLES), (req, res) => {
+app.delete("/salesorder/:id", verifyToken, canDeleteSalesOrder, (req, res) => {
     const salesOrderId = req.params.id;
     const dateNow = now();
     const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;

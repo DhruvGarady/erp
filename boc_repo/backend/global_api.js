@@ -1,11 +1,22 @@
 const bcrypt = require("bcrypt");
 const nodemailer = require("nodemailer");
 const { now, toIntOrNull, normalizeYN, getListLimit } = require("./helpers");
+const { FEATURE } = require("./rbac");
 
-module.exports = function registerGlobalApi({ app, pool, verifyToken, requireRole, rbac }) {
+module.exports = function registerGlobalApi({ app, pool, verifyToken, rbac }) {
 //----------------------------------------------------USER TABLE------------------------------------------------
     const saltRounds = 10;
-    const ACCESS_ADMIN_ROLES = ["ADMIN"];
+
+    const { requirePermission } = rbac;
+
+    // The RBAC admin screens each gate on their own feature rather than
+    // on the ADMIN role, so an install can hand role maintenance to
+    // someone who is not a full administrator -- which is the whole
+    // point of per-feature grants.
+    //
+    // Note these gate the screens that edit grants. Revoking ADMIN's
+    // own ADMIN_ROLE_FEATURE grant leaves no way back through the UI;
+    // recovery is a SQL update against role_features.
 
 const jwt = require("jsonwebtoken");
 
@@ -184,7 +195,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
     `;
     }
 
-    app.get("/users/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.get("/users/list", verifyToken, requirePermission(FEATURE.ADMIN_USER, "view"), (req, res) => {
         const where = [];
         const values = [];
         const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
@@ -225,7 +236,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.get("/features/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.get("/features/list", verifyToken, requirePermission(FEATURE.ADMIN_ROLE_FEATURE, "view"), (req, res) => {
         const where = [];
         const values = [];
         const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
@@ -273,7 +284,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.get("/roles/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.get("/roles/list", verifyToken, requirePermission(FEATURE.ADMIN_ROLE, "view"), (req, res) => {
         const where = [];
         const values = [];
         const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
@@ -313,7 +324,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.post("/roles/create", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.post("/roles/create", verifyToken, requirePermission(FEATURE.ADMIN_ROLE, "create"), (req, res) => {
         const roleName = String(req.body.role_name || "").trim();
         const roleDescription = String(req.body.role_description || "").trim();
         const isActive = normalizeYN(req.body.is_active, "Y");
@@ -363,7 +374,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.put("/roles/update/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.put("/roles/update/:id", verifyToken, requirePermission(FEATURE.ADMIN_ROLE, "edit"), (req, res) => {
         const roleId = toIntOrNull(req.params.id);
         const roleName = String(req.body.role_name || "").trim();
         const roleDescription = String(req.body.role_description || "").trim();
@@ -420,7 +431,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.delete("/roles/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.delete("/roles/:id", verifyToken, requirePermission(FEATURE.ADMIN_ROLE, "delete"), (req, res) => {
         const roleId = toIntOrNull(req.params.id);
 
         if (!roleId) {
@@ -468,7 +479,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.get("/roles/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.get("/roles/:id", verifyToken, requirePermission(FEATURE.ADMIN_ROLE, "view"), (req, res) => {
         const roleId = toIntOrNull(req.params.id);
 
         if (!roleId) {
@@ -501,7 +512,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.get("/userroles/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.get("/userroles/list", verifyToken, requirePermission(FEATURE.ADMIN_USER_ROLE, "view"), (req, res) => {
         const where = [];
         const values = [];
         const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
@@ -559,7 +570,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.post("/userroles/create", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.post("/userroles/create", verifyToken, requirePermission(FEATURE.ADMIN_USER_ROLE, "create"), (req, res) => {
         const userId = toIntOrNull(req.body.user_id);
         const roleId = toIntOrNull(req.body.role_id);
         const isActive = normalizeYN(req.body.is_active, "Y");
@@ -633,7 +644,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.put("/userroles/update/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.put("/userroles/update/:id", verifyToken, requirePermission(FEATURE.ADMIN_USER_ROLE, "edit"), (req, res) => {
         const userRoleId = toIntOrNull(req.params.id);
         const userId = toIntOrNull(req.body.user_id);
         const roleId = toIntOrNull(req.body.role_id);
@@ -714,7 +725,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.delete("/userroles/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.delete("/userroles/:id", verifyToken, requirePermission(FEATURE.ADMIN_USER_ROLE, "delete"), (req, res) => {
         const userRoleId = toIntOrNull(req.params.id);
 
         if (!userRoleId) {
@@ -744,7 +755,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.get("/userroles/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.get("/userroles/:id", verifyToken, requirePermission(FEATURE.ADMIN_USER_ROLE, "view"), (req, res) => {
         const userRoleId = toIntOrNull(req.params.id);
 
         if (!userRoleId) {
@@ -783,7 +794,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.get("/rolefeatures/list", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.get("/rolefeatures/list", verifyToken, requirePermission(FEATURE.ADMIN_ROLE_FEATURE, "view"), (req, res) => {
         const where = [];
         const values = [];
         const isActive = String(req.query.is_active || "ALL").trim().toUpperCase();
@@ -848,7 +859,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.post("/rolefeatures/create", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.post("/rolefeatures/create", verifyToken, requirePermission(FEATURE.ADMIN_ROLE_FEATURE, "create"), (req, res) => {
         const roleId = toIntOrNull(req.body.role_id);
         const featureId = String(req.body.feature_id || "").trim();
         const canView = normalizeYN(req.body.can_view, "Y");
@@ -947,7 +958,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.put("/rolefeatures/update/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.put("/rolefeatures/update/:id", verifyToken, requirePermission(FEATURE.ADMIN_ROLE_FEATURE, "edit"), (req, res) => {
         const roleFeatureId = toIntOrNull(req.params.id);
         const roleId = toIntOrNull(req.body.role_id);
         const featureId = String(req.body.feature_id || "").trim();
@@ -1053,7 +1064,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.delete("/rolefeatures/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.delete("/rolefeatures/:id", verifyToken, requirePermission(FEATURE.ADMIN_ROLE_FEATURE, "delete"), (req, res) => {
         const roleFeatureId = toIntOrNull(req.params.id);
 
         if (!roleFeatureId) {
@@ -1083,7 +1094,7 @@ function buildActivationEmailHtml(fullName, activationLink) {
         });
     });
 
-    app.get("/rolefeatures/:id", verifyToken, requireRole(ACCESS_ADMIN_ROLES), (req, res) => {
+    app.get("/rolefeatures/:id", verifyToken, requirePermission(FEATURE.ADMIN_ROLE_FEATURE, "view"), (req, res) => {
         const roleFeatureId = toIntOrNull(req.params.id);
 
         if (!roleFeatureId) {
@@ -1661,7 +1672,7 @@ app.post("/user/password-reset/confirm", async (req, res) => {
     });
 });
 
-app.post("/auth/create-user", verifyToken, requireRole(["ADMIN"]), async (req, res) => {
+app.post("/auth/create-user", verifyToken, requirePermission(FEATURE.ADMIN_USER, "create"), async (req, res) => {
     const {
         employee_code,
         full_name,

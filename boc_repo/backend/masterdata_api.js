@@ -7,7 +7,9 @@ const {
     withAuditFields
 } = require("./helpers");
 
-module.exports = function registerMasterdataApi({ app, pool, verifyToken, userHasRole, requireRole }) {
+const { FEATURE, MASTER_TABLE_FEATURE } = require("./rbac");
+
+module.exports = function registerMasterdataApi({ app, pool, verifyToken, rbac }) {
 //-------------------------------------MASTER DATA TABLES---------------------------------------------
 
 // ============================================================
@@ -21,9 +23,30 @@ module.exports = function registerMasterdataApi({ app, pool, verifyToken, userHa
 // DELETE /api/v1/:table/:id   -> soft delete
 // ============================================================
 
-const MASTER_ADMIN_ROLES = ["ADMIN"];
-const MASTER_OPERATIONAL_ROLES = ["ADMIN", "MANAGER"];
-const MASTER_FINANCE_ROLES = ["ADMIN", "FINANCE"];
+const { requirePermission } = rbac;
+
+// The /api/v1/:table routes are generic, so the feature is not known
+// until the request arrives. Resolve it from the parameter.
+//
+// An unrecognised table is not a permission question: it falls through
+// to the handler, which answers 400 "Invalid table name". Deciding that
+// here instead would turn a bad table name into a 404 and hide the
+// difference between "you may not" and "there is no such thing".
+//
+// hasOwnProperty, not a bare lookup -- "__proto__" and "constructor"
+// resolve on the prototype chain and would otherwise arrive at
+// requirePermission as a non-string feature code.
+function requireTablePermission(action) {
+    return (req, res, next) => {
+        const table = req.params.table;
+
+        if (!Object.prototype.hasOwnProperty.call(MASTER_TABLE_FEATURE, table)) {
+            return next();
+        }
+
+        return requirePermission(MASTER_TABLE_FEATURE[table], action)(req, res, next);
+    };
+}
 
 const MASTER_TABLE_CONFIG = {
     mst_customer: {
@@ -33,7 +56,6 @@ const MASTER_TABLE_CONFIG = {
         unique: ["customer_code"],
         numeric: ["credit_days", "credit_limit"],
         searchable: ["customer_code", "customer_name", "contact_person", "email", "phone", "gst_no", "city", "state", "country"],
-        writeRoles: MASTER_OPERATIONAL_ROLES,
         deactivateReferences: [
             { table: "quotations", column: "customer_id", condition: "is_active = 'Y'" },
             { table: "sales_orders", column: "customer_id", condition: "is_active = 'Y'" }
@@ -46,7 +68,6 @@ const MASTER_TABLE_CONFIG = {
         unique: ["vendor_code"],
         numeric: [],
         searchable: ["vendor_code", "vendor_name", "contact_person", "email", "phone", "gst_no", "city", "state", "country"],
-        writeRoles: MASTER_OPERATIONAL_ROLES,
         deactivateReferences: [
             { table: "goods_receipts", column: "vendor_id", condition: "is_active = 'Y'" }
         ]
@@ -72,7 +93,6 @@ const MASTER_TABLE_CONFIG = {
             "costing_method",
             "dimension_uom"
         ],
-        writeRoles: MASTER_OPERATIONAL_ROLES,
         deactivateReferences: [
             { table: "mst_bom", column: "parent_material_id", condition: "is_active = 'Y'" },
             { table: "mst_bom_items", column: "child_material_id", condition: "is_active = 'Y'" },
@@ -88,7 +108,6 @@ const MASTER_TABLE_CONFIG = {
         unique: ["currency_code"],
         numeric: [],
         searchable: ["currency_code", "currency_name", "currency_symbol", "description"],
-        writeRoles: MASTER_FINANCE_ROLES,
         deactivateReferences: [
             { table: "mst_material", column: "currency_id", condition: "is_active = 'Y'" },
             { table: "quotations", column: "currency_id", condition: "is_active = 'Y'" },
@@ -101,7 +120,6 @@ const MASTER_TABLE_CONFIG = {
         required: ["uom_code", "uom_name"],
         unique: ["uom_code"],
         searchable: ["uom_code", "uom_name", "description"],
-        writeRoles: MASTER_OPERATIONAL_ROLES,
         deactivateReferences: [
             { table: "mst_material", column: "base_uom_id", condition: "is_active = 'Y'" },
             { table: "mst_material", column: "purchase_uom_id", condition: "is_active = 'Y'" },
@@ -118,7 +136,6 @@ const MASTER_TABLE_CONFIG = {
         unique: ["tax_code"],
         numeric: ["tax_percent"],
         searchable: ["tax_code", "tax_name", "tax_type", "description"],
-        writeRoles: MASTER_FINANCE_ROLES,
         deactivateReferences: [
             { table: "mst_material", column: "tax_id", condition: "is_active = 'Y'" },
             { table: "quotation_items", column: "tax_id", condition: "is_active = 'Y'" },
@@ -132,7 +149,6 @@ const MASTER_TABLE_CONFIG = {
         unique: ["payment_term_code"],
         numeric: ["no_of_days"],
         searchable: ["payment_term_code", "payment_term_name", "description"],
-        writeRoles: MASTER_FINANCE_ROLES,
         deactivateReferences: [
             { table: "quotations", column: "payment_term_id", condition: "is_active = 'Y'" },
             { table: "sales_orders", column: "payment_term_id", condition: "is_active = 'Y'" }
@@ -144,7 +160,6 @@ const MASTER_TABLE_CONFIG = {
         required: ["material_group_code", "material_group_name"],
         unique: ["material_group_code"],
         searchable: ["material_group_code", "material_group_name", "description"],
-        writeRoles: MASTER_OPERATIONAL_ROLES,
         deactivateReferences: [
             { table: "mst_material", column: "material_group_id", condition: "is_active = 'Y'" }
         ]
@@ -155,8 +170,7 @@ const MASTER_TABLE_CONFIG = {
         required: ["bom_code", "bom_name", "parent_material_id"],
         unique: ["bom_code"],
         numeric: ["material_category_id", "parent_material_id"],
-        searchable: ["bom_code", "bom_name", "version_no", "material_category", "parent_material_name", "remarks"],
-        writeRoles: MASTER_OPERATIONAL_ROLES
+        searchable: ["bom_code", "bom_name", "version_no", "material_category", "parent_material_name", "remarks"]
     },
     mst_warehouse: {
         pk: "warehouse_id",
@@ -164,7 +178,6 @@ const MASTER_TABLE_CONFIG = {
         required: ["warehouse_code", "warehouse_name"],
         unique: ["warehouse_code"],
         searchable: ["warehouse_code", "warehouse_name", "warehouse_type", "contact_person", "email", "phone", "city", "state", "country"],
-        writeRoles: MASTER_OPERATIONAL_ROLES,
         deactivateReferences: [
             { table: "inventory_summary", column: "warehouse_id", condition: "is_active = 'Y' AND (COALESCE(on_hand_qty, 0) <> 0 OR COALESCE(reserved_qty, 0) <> 0)" },
             { table: "goods_receipts", column: "warehouse_id", condition: "is_active = 'Y'" },
@@ -177,7 +190,6 @@ const MASTER_TABLE_CONFIG = {
         required: ["gl_account_code", "gl_account_name", "account_type"],
         unique: ["gl_account_code"],
         searchable: ["gl_account_code", "gl_account_name", "account_type", "account_group", "description"],
-        writeRoles: MASTER_FINANCE_ROLES,
         deactivateReferences: [
             { table: "trn_journal_entry", column: "gl_account_id", condition: "is_active = 'Y'" }
         ]
@@ -187,8 +199,7 @@ const MASTER_TABLE_CONFIG = {
         fields: withAuditFields(["bom_id", "line_no", "material_category_id", "material_category", "child_material_id", "child_material_name", "part_code", "quantity", "uom_id", "scrap_percent", "remarks"]),
         required: ["bom_id", "child_material_id", "quantity"],
         numeric: ["bom_id", "line_no", "material_category_id", "child_material_id", "quantity", "uom_id", "scrap_percent"],
-        searchable: ["material_category", "child_material_name", "part_code", "remarks"],
-        writeRoles: MASTER_OPERATIONAL_ROLES
+        searchable: ["material_category", "child_material_name", "part_code", "remarks"]
     }
 };
 
@@ -196,15 +207,6 @@ function getTableConfig(tableName) {
     return Object.prototype.hasOwnProperty.call(MASTER_TABLE_CONFIG, tableName)
         ? MASTER_TABLE_CONFIG[tableName]
         : null;
-}
-
-function ensureMasterWriteAccess(req, config, res) {
-    if (userHasRole && userHasRole(req, config.writeRoles || MASTER_ADMIN_ROLES)) {
-        return true;
-    }
-
-    res.status(403).json({ error: "Access denied. You do not have permission to modify this master data." });
-    return false;
 }
 
 function buildColumnList(config) {
@@ -283,7 +285,7 @@ function checkDeactivateDependencies(config, recordId, callback) {
 // ==================================================================
 // 1. GET /api/v1/:table  -> list with pagination and filtering
 // ==================================================================
-app.get("/api/v1/:table", verifyToken, (req, res) => {
+app.get("/api/v1/:table", verifyToken, requireTablePermission("view"), (req, res) => {
     const tableName = req.params.table;
     const config = getTableConfig(tableName);
 
@@ -325,7 +327,7 @@ app.get("/api/v1/:table", verifyToken, (req, res) => {
 // ==================================================================
 // 2. GET /api/v1/:table/:id  -> single record details
 // ==================================================================
-app.get("/api/v1/:table/:id", verifyToken, (req, res) => {
+app.get("/api/v1/:table/:id", verifyToken, requireTablePermission("view"), (req, res) => {
     const tableName = req.params.table;
     const recordId = req.params.id;
     const config = getTableConfig(tableName);
@@ -353,16 +355,12 @@ app.get("/api/v1/:table/:id", verifyToken, (req, res) => {
 // ==================================================================
 // 3. POST /api/v1/:table  -> create record
 // ==================================================================
-app.post("/api/v1/:table", verifyToken, (req, res) => {
+app.post("/api/v1/:table", verifyToken, requireTablePermission("create"), (req, res) => {
     const tableName = req.params.table;
     const config = getTableConfig(tableName);
 
     if (!config) {
         return res.status(400).json({ error: "Invalid table name" });
-    }
-
-    if (!ensureMasterWriteAccess(req, config, res)) {
-        return;
     }
 
     const sanitized = sanitizeMasterPayload(config, req.body, true);
@@ -413,17 +411,13 @@ app.post("/api/v1/:table", verifyToken, (req, res) => {
 // ==================================================================
 // 4. PUT /api/v1/:table/:id  -> update record
 // ==================================================================
-app.put("/api/v1/:table/:id", verifyToken, (req, res) => {
+app.put("/api/v1/:table/:id", verifyToken, requireTablePermission("edit"), (req, res) => {
     const tableName = req.params.table;
     const recordId = req.params.id;
     const config = getTableConfig(tableName);
 
     if (!config) {
         return res.status(400).json({ error: "Invalid table name" });
-    }
-
-    if (!ensureMasterWriteAccess(req, config, res)) {
-        return;
     }
 
     const sanitized = sanitizeMasterPayload(config, req.body, false);
@@ -476,17 +470,13 @@ app.put("/api/v1/:table/:id", verifyToken, (req, res) => {
 // ==================================================================
 // 5. DELETE /api/v1/:table/:id  -> soft delete
 // ==================================================================
-app.delete("/api/v1/:table/:id", verifyToken, (req, res) => {
+app.delete("/api/v1/:table/:id", verifyToken, requireTablePermission("delete"), (req, res) => {
     const tableName = req.params.table;
     const recordId = req.params.id;
     const config = getTableConfig(tableName);
 
     if (!config) {
         return res.status(400).json({ error: "Invalid table name" });
-    }
-
-    if (!ensureMasterWriteAccess(req, config, res)) {
-        return;
     }
 
     const updatedBy = (req.body && req.body.updated_by) || (req.user && req.user.username) || null;
@@ -545,7 +535,7 @@ function getJournalEntriesByHeaderId(journalHeaderId, cb) {
     pool.query(sql, [journalHeaderId], cb);
 }
 
-app.get("/api/v1/journals/trial-balance", verifyToken, (req, res) => {
+app.get("/api/v1/journals/trial-balance", verifyToken, requirePermission(FEATURE.ACC_JOURNAL, "view"), (req, res) => {
     const sql = `
         SELECT 
             gl_account_id,
@@ -567,7 +557,7 @@ app.get("/api/v1/journals/trial-balance", verifyToken, (req, res) => {
     });
 });
 
-app.post("/api/v1/journals", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
+app.post("/api/v1/journals", verifyToken, requirePermission(FEATURE.ACC_JOURNAL, "create"), (req, res) => {
     const { header, entries } = req.body;
     const ts = now();
 
@@ -667,7 +657,7 @@ app.post("/api/v1/journals", verifyToken, requireRole(MASTER_FINANCE_ROLES), (re
     });
 });
 
-app.post("/api/v1/journals/:id/post", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
+app.post("/api/v1/journals/:id/post", verifyToken, requirePermission(FEATURE.ACC_JOURNAL, "approve"), (req, res) => {
     const journalHeaderId = req.params.id;
     const ts = now();
     const sql = `
@@ -682,7 +672,7 @@ app.post("/api/v1/journals/:id/post", verifyToken, requireRole(MASTER_FINANCE_RO
     });
 });
 
-app.post("/api/v1/journals/:id/reverse", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
+app.post("/api/v1/journals/:id/reverse", verifyToken, requirePermission(FEATURE.ACC_JOURNAL, "approve"), (req, res) => {
     const journalHeaderId = req.params.id;
     const ts = now();
 
@@ -772,14 +762,14 @@ app.post("/api/v1/journals/:id/reverse", verifyToken, requireRole(MASTER_FINANCE
     });
 });
 
-app.get("/api/v1/periods/current", verifyToken, (req, res) => {
+app.get("/api/v1/periods/current", verifyToken, requirePermission(FEATURE.ACC_FISCAL_PERIOD, "view"), (req, res) => {
     getCurrentFiscalPeriod((err, rows) => {
         if (err) return res.status(500).json({ error: "Failed to fetch current period" });
         res.json(rows[0] || null);
     });
 });
 
-app.patch("/api/v1/periods/:id/close", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
+app.patch("/api/v1/periods/:id/close", verifyToken, requirePermission(FEATURE.ACC_FISCAL_PERIOD, "approve"), (req, res) => {
     const periodId = req.params.id;
     const ts = now();
 
@@ -797,7 +787,7 @@ app.patch("/api/v1/periods/:id/close", verifyToken, requireRole(MASTER_FINANCE_R
     });
 });
 
-app.patch("/api/v1/periods/:id/reopen", verifyToken, requireRole(MASTER_FINANCE_ROLES), (req, res) => {
+app.patch("/api/v1/periods/:id/reopen", verifyToken, requirePermission(FEATURE.ACC_FISCAL_PERIOD, "approve"), (req, res) => {
     const periodId = req.params.id;
     const ts = now();
     const role = req.user?.role_name || '';

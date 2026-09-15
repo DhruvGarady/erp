@@ -32,12 +32,13 @@ Backend uses `function` declarations for helpers, arrow functions only for route
 ### Module contract
 
 ```js
-module.exports = function registerXApi({ app, pool, verifyToken, requireRole, rbac }) {
+module.exports = function registerXApi({ app, pool, verifyToken, rbac }) {
+    const { requirePermission } = rbac;
     // entire file body lives here
 };
 ```
 
-Destructure only what you use. `rbac` carries `requirePermission` — see Permissions below.
+Destructure only what you use. `requireRole` and `userHasRole` are still passed in but no module takes them any more — see Permissions below.
 
 Wire it with one line in `api.js` and add it to the `check` script in `package.json`.
 
@@ -45,7 +46,7 @@ Wire it with one line in `api.js` and add it to the `check` script in `package.j
 
 | Building | Do this |
 |---|---|
-| New master entity | Add a config block to `MASTER_TABLE_CONFIG` in `backend/masterdata_api.js`. **No route code** — the generic `/api/v1/:table` handlers derive everything. |
+| New master entity | Add a config block to `MASTER_TABLE_CONFIG` in `backend/masterdata_api.js`, **and** a `MASTER_TABLE_FEATURE` entry in `backend/rbac.js`. **No route code** — the generic `/api/v1/:table` handlers derive everything, including the permission, from the table name. A table with no feature entry falls through the gate ungated; a test fails the build if you forget. |
 | Flat table CRUD | `registerSimpleTableRoutes({routeBase, tableName, pk, columns, searchable, label})` |
 | Header+items document | `registerInventoryDocumentRoutes({...})` — numbering, transactions, status come free |
 | Genuinely bespoke | Hand-write it, `sales_api.js` style |
@@ -102,13 +103,33 @@ Two distinct outcomes, and the difference is deliberate:
 | `features.is_active = 'N'` — module not enabled for this install | **404** — the feature is absent, not forbidden |
 | No `role_features` grant for the action | **403** |
 
+That first row is the per-install customisation mechanic, and it works end to end: flipping `is_active` to `'N'` drops the module from the sidebar *and* makes its routes 404, within the 60s cache TTL, no restart. Disabled outranks granted — a role holding every action on a disabled feature still gets 404.
+
+A feature with no `features` row at all behaves the same way, which is why the accounting routes (`ACC_JOURNAL`, `ACC_FISCAL_PERIOD`, `ACC_GL_ACCOUNT`) answer 404 today. They switch on by seeding the rows, with no code change.
+
 Reference features by the `FEATURE.*` constant, never by raw `TR102` — `features.id` is hand-assigned and will be renumbered. The stable key is `features.feature_code`.
 
 Permissions are cached in process (60s TTL). Call `rbac.invalidate()` after any write to `role_features` or `user_roles`.
 
-`requireRole([...])` still exists and now matches **exactly** — it's fine for genuinely role-shaped checks, but per-feature grants are preferred for anything a customer might want to reconfigure.
+`requireRole([...])` still exists and matches **exactly**, but **no route uses it any more** — every route registration is on a feature grant. It is kept for genuinely role-shaped checks and because the substring bug it used to have is worth a standing guard.
 
-**Inherited gap: reads are still open to any authenticated user.** 18 of 26 GET routes have no permission check. Combined with public `/user/register`, that is a live data-exposure path — see the remediation plan. New routes should gate reads with `requirePermission(..., "view")`.
+**Reads are gated too.** Every GET carries `requirePermission(..., "view")`. This was not always so: until the migration, `verifyToken` was the only middleware on 18 of 26 GETs, so any authenticated user could list every quotation, customer and stock movement in the install.
+
+`test/security/route-permission-coverage.test.js` fails the build if a route is added without a gate. A route that genuinely should not have one goes in that file's `EXEMPT` map with a reason — login, activation, password reset, the caller's own profile, and `/feature/getFeature` (gating the grants endpoint on a grant is circular).
+
+`/user/register` is still public. That is deliberate for now and listed as exempt, but it is the remaining data-exposure path: anyone can mint an account.
+
+### A page can only read what its role can read
+
+Gating reads has a consequence that is easy to miss. A role that can open a page but cannot read the master tables that page loads gets empty dropdowns and a row of 403s in the console — the screen looks broken, not forbidden.
+
+`boc-db/migrations/002_feature_read_dependencies.sql` holds the page-to-master dependency list and grants `can_view` across its **transitive closure**. One pass is not enough: granting FINANCE read on `mst_material` (because it can open a sales order) means FINANCE can now open the material page, which reads `mst_vendor` and `mst_material_group` in turn.
+
+**Adding a master-data lookup to a page means adding a row to that list.** Derive it, don't guess:
+
+```bash
+grep -o '"mst_[a-z_]*"' pages/<module>/scripts/<page>.js | sort -u
+```
 
 ## Frontend
 
@@ -238,15 +259,15 @@ Write them idempotently (`NOT EXISTS` guards, `IF NOT EXISTS`) so a partially-ap
 1. `CREATE TABLE` → `../boc-db/tables.sql`
 2. Unique keys → `backend/schema_hardening.sql`
 3. If it's a document, seed a `document_sequences` row
-4. API → config block in `MASTER_TABLE_CONFIG`, or a new `backend/<module>_api.js` wired in `api.js` + `package.json` check script
+4. API → config block in `MASTER_TABLE_CONFIG` (+ `MASTER_TABLE_FEATURE`), or a new `backend/<module>_api.js` wired in `api.js` + `package.json` check script. Every route gets `requirePermission(FEATURE.X, action)`, reads included.
 5. Pages → `<x>_inq.html` + `scripts/<x>_inq.js` (clone `vendorinq`), `<x>_add.html` + `scripts/<x>_add.js` (clone `customer_add`)
 6. Menu → `features` row with next free `TR<nnn>` AND a `feature_code`; add the code to `FEATURE` in `backend/rbac.js`
-7. RBAC → `role_features` grants per role (enforced — see Permissions above)
+7. RBAC → `role_features` grants per role (enforced — see Permissions above), and add any master-data lookups the page makes to the dependency list in migration `002`
 8. Seed → `docs_repo/masterdata/data/<table>_N_records.sql`
 
 ## Known broken — don't copy these patterns
 
-- **`POST /salesorder/create` throws.** `STOCK_RESERVATION_COLUMNS` is used in `sales_api.js:999` but declared inside `registerInventoryApi`'s closure. Each module is its own closure — it never reaches `globalThis`. Define shared column lists locally.
+- **Timestamps are written in two different timezones.** `helpers.now()` is `toISOString()`, i.e. UTC, while the `DEFAULT CURRENT_TIMESTAMP` on `role_features` and friends is MySQL's local time. On this machine that is a 5h30m skew between rows written by the app and rows written by a column default, inside the same table.
 - **Four routes are unreachable** (`:param` registered before literal): `POST /api/v1/journals`, `GET /api/v1/journals/trial-balance`, `GET /api/v1/periods/current`, `GET /quotation/nextno`.
 - **`/feature/getFeature` used to return every feature to everyone** and had no error response at all. Both fixed — see RBAC below.
 - **`/auth/login` falls back to plaintext password comparison** (`global_api.js:1213`) when the stored hash doesn't start with `$2`. Intended as a legacy-upgrade path; it means a non-bcrypt `password_hash` authenticates by string equality. Live data is all bcrypt today.
@@ -257,12 +278,12 @@ Each of these is pinned by a `{ todo }` test that flips green when fixed — see
 
 ## Tests
 
-`npm test` runs syntax check + unit + security + regression (216 tests, no external dependencies — `node:test` only).
+`npm test` runs syntax check + unit + security + regression (258 tests, no external dependencies — `node:test` only).
 
 | Script | Covers |
 |---|---|
 | `npm run test:unit` | pure helpers in `backend/helpers.js`, plus `calculateLineAmounts` from both page scripts |
-| `npm run test:security` | token verification, role gating, mass assignment, table whitelist, login |
+| `npm run test:security` | token verification, permission gating, **route permission coverage**, mass assignment, table whitelist, login |
 | `npm run test:regression` | the known-broken list above |
 | `npm run test:integration` | needs MySQL; opt in with `RUN_DB_WRITE_TESTS=1`. Every write runs in a transaction that is always rolled back. |
 
@@ -341,4 +362,8 @@ function deleteUom(id) {
 
 **All of this is cosmetic.** `requirePermission()` on the route is what actually enforces access; the frontend only removes controls the user cannot use.
 
-Helpers: `canDo(action)` / `canDo(featureCode, action)`, `ensurePermission(action, message)`, `getPageFeature()`, `refreshFeaturePermissions(cb)` (re-pulls grants without a re-login — call it after editing `role_features`).
+Helpers: `canDo(action)` / `canDo(featureCode, action)`, `ensurePermission(action, message)`, `getPageFeature()`, `featurePermissionsKnown()`, `refreshFeaturePermissions(cb)`.
+
+`refreshFeaturePermissions` re-pulls grants without a re-login — call it after editing `role_features`. It rebuilds **all three** things the grants feed: the cached permission map, the sidebar, and the Save decision on an `_add` screen. Storing the new grants without re-rendering leaves a revoked feature sitting in the menu until the next login, which defeats the point.
+
+**An absent grant map is not a denial.** `getFeaturePermissions()` returns `{}` both before the fetch lands and when the grants genuinely allow nothing — `featurePermissionsKnown()` is how you tell them apart. Anything that acts on a denial has to ask first: `applyRecordPermissions` used to skip that and would mark an authorised screen read-only, hide Save, and fire "You do not have permission to create records here" at a user who did. It now defers until the grants arrive and is re-run by the refresh.

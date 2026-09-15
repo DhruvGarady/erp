@@ -75,7 +75,16 @@ const FEATURE = {
     ADMIN_USER_ROLE: "ADMIN_USER_ROLE",
     ADMIN_USER: "ADMIN_USER",
     ADMIN_ROLE_FEATURE: "ADMIN_ROLE_FEATURE",
-    ADMIN_LICENSE: "ADMIN_LICENSE"
+    ADMIN_LICENSE: "ADMIN_LICENSE",
+
+    // Accounting. Tables and routes exist; there is no features row for
+    // any of these yet, so isFeatureEnabled says no and the routes
+    // answer 404 -- which is the correct reading. The module is not
+    // enabled in this install, not forbidden to the caller. Seed the
+    // features rows when the screens are built and they switch on.
+    ACC_GL_ACCOUNT: "ACC_GL_ACCOUNT",
+    ACC_JOURNAL: "ACC_JOURNAL",
+    ACC_FISCAL_PERIOD: "ACC_FISCAL_PERIOD"
 };
 
 // Which master table each /api/v1/:table route maps to, so the generic
@@ -92,7 +101,7 @@ const MASTER_TABLE_FEATURE = {
     mst_payment_terms: FEATURE.MST_PAYMENT_TERMS,
     mst_bom: FEATURE.MST_BOM,
     mst_bom_items: FEATURE.MST_BOM,
-    mst_gl_account: FEATURE.MST_CURRENCY
+    mst_gl_account: FEATURE.ACC_GL_ACCOUNT
 };
 
 const PERMISSION_SQL = `

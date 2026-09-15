@@ -107,9 +107,32 @@ require("./backend/purchase_api")({ app, pool, ...authTools });
 
 app.use(errorLogger);
 
-app.listen(port, () => {
+// The listen callback fires even when the bind FAILED -- on EADDRINUSE it
+// is invoked with server.listening === false and address() === null, so
+// logging unconditionally here announces a server that does not exist.
+const server = app.listen(port, () => {
+    if (!server.listening) {
+        return;
+    }
+
     logger.info("Server running", {
         port,
         dbConnectionLimit
     });
+});
+
+// Without this, starting a second copy while one is already running logs
+// "Server running" and then serves nothing: the process stays alive
+// holding no listening socket, so every request goes to the OLD server.
+// A stale one can then sit there for hours answering 404 for routes added
+// since it booted, and nothing anywhere says so.
+server.on("error", (err) => {
+    logger.error("Server failed to start", {
+        port,
+        code: err.code,
+        message: err.code === "EADDRINUSE"
+            ? `Port ${port} is already in use -- another instance is probably still running`
+            : err.message
+    });
+    process.exit(1);
 });

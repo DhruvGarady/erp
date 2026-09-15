@@ -56,6 +56,7 @@ function registerAll() {
     require("../../backend/masterdata_api")(deps);
     require("../../backend/sales_api")(deps);
     require("../../backend/inventory_api")(deps);
+    require("../../backend/purchase_api")(deps);
 
     return app;
 }
@@ -111,7 +112,7 @@ describe("route permission coverage", () => {
 
     test("no route still carries a hardcoded role array", () => {
         const fs = require("node:fs");
-        const offenders = ["global_api", "masterdata_api", "sales_api", "inventory_api"]
+        const offenders = ["global_api", "masterdata_api", "sales_api", "inventory_api", "purchase_api"]
             .map(name => ({ name, source: fs.readFileSync(`backend/${name}.js`, "utf8") }))
             .filter(({ source }) => /requireRole\(/.test(source))
             .map(({ name }) => name);

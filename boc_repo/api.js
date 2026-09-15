@@ -103,6 +103,7 @@ require("./backend/global_api")({ app, pool, ...authTools });
 require("./backend/masterdata_api")({ app, pool, ...authTools });
 require("./backend/sales_api")({ app, pool, ...authTools });
 require("./backend/inventory_api")({ app, pool, ...authTools });
+require("./backend/purchase_api")({ app, pool, ...authTools });
 
 app.use(errorLogger);
 

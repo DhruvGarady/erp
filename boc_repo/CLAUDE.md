@@ -49,6 +49,7 @@ Wire it with one line in `api.js` and add it to the `check` script in `package.j
 | New master entity | Add a config block to `MASTER_TABLE_CONFIG` in `backend/masterdata_api.js`, **and** a `MASTER_TABLE_FEATURE` entry in `backend/rbac.js`. **No route code** — the generic `/api/v1/:table` handlers derive everything, including the permission, from the table name. A table with no feature entry falls through the gate ungated; a test fails the build if you forget. |
 | Flat table CRUD | `registerSimpleTableRoutes({routeBase, tableName, pk, columns, searchable, label})` |
 | Header+items document | `registerInventoryDocumentRoutes({...})` — numbering, transactions, status come free |
+| Header+items with an approval workflow | `backend/purchase_api.js` — copy the `STATUS` / `TRANSITIONS` pair and `applyTransition` |
 | Genuinely bespoke | Hand-write it, `sales_api.js` style |
 
 Route shapes: `/<entity>/list`, `/<entity>/nextno`, `/<entity>/:id`, `POST /<entity>/create`, `PUT /<entity>/update/:id`, `PATCH /<entity>/status/:id`, `DELETE /<entity>/:id`. Master data only uses `/api/v1/:table`.
@@ -244,7 +245,9 @@ Menu entries live in the `features` table (`id`, `feature_name`, `feature_url`, 
 
 > **The live DB is ahead of the committed SQL — trust the DB.** `../boc-db/tables.sql` and the seed CSV are stale: they show 18 features with `/boc_repo/pages/...` URLs and `feature_url VARCHAR(50)`. Live is 36 rows (TR100–TR136), `/pages/...` URLs, and `varchar(225)`. Re-export the seed files before relying on them.
 
-**13 active menu entries point at pages that don't exist yet** — TR109–TR115 (inventory), TR128–TR129 (purchase), TR130/TR131/TR134/TR136 (admin). They render in the sidebar and 404 on click. That list doubles as the build roadmap.
+**12 active menu entries point at pages that don't exist yet** — TR109–TR115 (inventory), TR129 (purchase order), TR130/TR131/TR134/TR136 (admin). They render in the sidebar and 404 on click. That list doubles as the build roadmap. TR128 (purchase indent) was one of them and is now built.
+
+A module whose pages do not exist is better switched off than left 404ing: `UPDATE features SET is_active = 'N'` drops it from the sidebar *and* makes its routes answer 404, which is the honest answer for something this install does not have.
 
 ## Migrations
 
@@ -267,6 +270,10 @@ Write them idempotently (`NOT EXISTS` guards, `IF NOT EXISTS`) so a partially-ap
 
 ## Known broken — don't copy these patterns
 
+- **`PATCH /quotation/status/:id` lets any status become any other.** It is `SET status = COALESCE(?, status)` with no transition rules, so an approved quotation can be walked back to Draft, or jumped straight from Draft to Approved. Only the *approve* action is grant-checked; the rest is unconstrained. `purchase_api.js` shows the shape to copy instead — a declared `TRANSITIONS` table with a `from` whitelist, and the target status taken from the route rather than the body.
+
+- **Dates render a day early on the sales and inventory pages.** mysql2 returns a `DATE` as a JS Date at local midnight, which JSON-serializes to the previous day in UTC — `2026-09-15` arrives as `2026-09-14T18:30:00.000Z`. Those pages do `String(value).slice(0, 10)`, so they display the wrong day and re-save it, and the date walks backwards once per edit. `pages/purchase/scripts/purchase_indent_*.js` has the fix: parse and read the **local** components back.
+
 - **Timestamps are written in two different timezones.** `helpers.now()` is `toISOString()`, i.e. UTC, while the `DEFAULT CURRENT_TIMESTAMP` on `role_features` and friends is MySQL's local time. On this machine that is a 5h30m skew between rows written by the app and rows written by a column default, inside the same table.
 - **Four routes are unreachable** (`:param` registered before literal): `POST /api/v1/journals`, `GET /api/v1/journals/trial-balance`, `GET /api/v1/periods/current`, `GET /quotation/nextno`.
 - **`/feature/getFeature` used to return every feature to everyone** and had no error response at all. Both fixed — see RBAC below.
@@ -278,11 +285,11 @@ Each of these is pinned by a `{ todo }` test that flips green when fixed — see
 
 ## Tests
 
-`npm test` runs syntax check + unit + security + regression (258 tests, no external dependencies — `node:test` only).
+`npm test` runs syntax check + unit + security + regression (290 tests, no external dependencies — `node:test` only).
 
 | Script | Covers |
 |---|---|
-| `npm run test:unit` | pure helpers in `backend/helpers.js`, plus `calculateLineAmounts` from both page scripts |
+| `npm run test:unit` | pure helpers in `backend/helpers.js`, `calculateLineAmounts` from both page scripts, and the purchase-indent approval state machine |
 | `npm run test:security` | token verification, permission gating, **route permission coverage**, mass assignment, table whitelist, login |
 | `npm run test:regression` | the known-broken list above |
 | `npm run test:integration` | needs MySQL; opt in with `RUN_DB_WRITE_TESTS=1`. Every write runs in a transaction that is always rolled back. |
@@ -296,6 +303,15 @@ Bugs are documented with `{ todo: "..." }` — the test runs, reports `not ok �
 ## Gaps worth knowing
 
 Tables + APIs exist but have **no `features` row**, so they're unreachable from the sidebar: all inventory screens (delivery, goods receipt, stock transfer, stock ledger, reservations, summary), all accounting screens (GL account, fiscal period, journals), and the RBAC admin screens.
+
+Purchase is now partly built: **Purchase Indent (TR128) is live** — table, API, both pages, grants. The rest of the cycle is not:
+
+```
+Purchase Indent ──> Approval ──> RFQ / Supplier Quotation ──> Supplier Selection
+      DONE           DONE          next                         next
+  ──> Purchase Order ──> Goods Receipt ──> Quality Check ──> Invoice ──> Payment
+      TR129, page only    /goodsreceipt exists    unbuilt      unbuilt    unbuilt
+```
 
 Per `docs_repo/notes.xlsx`, the intended inventory build order is: Delivery/Goods Issue → Stock Reservation → Stock Transfer → Stock Adjustment → Inventory Summary → Stock Ledger. **Stock Adjustment has no table at all.**
 

@@ -509,12 +509,23 @@ app.patch("/quotation/status/:id", verifyToken, canEditQuotation, (req, res) => 
     const { status, approval_status, reason, updated_by } = req.body || {};
     const dateNow = now();
     const updatedBy = updated_by || (req.user && req.user.user_id) || null;
-    const roleName = String(req.user && req.user.role_name ? req.user.role_name : "").toUpperCase();
     const nextStatus = String(status || "").toUpperCase();
     const nextApprovalStatus = String(approval_status || "").toUpperCase();
 
-    if ((nextStatus === "APPROVED" || nextApprovalStatus === "APPROVED") && roleName.indexOf("ADMIN") === -1) {
-        return res.status(403).json({ error: "Only ADMIN users can approve quotations" });
+    // Approving is a different grant from editing, so it is checked here
+    // rather than on the route -- this one endpoint does both.
+    //
+    // This was `role_name.indexOf("ADMIN") === -1`, the same substring
+    // test already removed from userHasRole and from the inquiry page:
+    // "NONADMIN" contains "ADMIN" and passed. It also read only the
+    // legacy single-role column, so a user whose roles array said ADMIN
+    // was refused. rbac.can reads the resolved roles and matches whole.
+    //
+    // The cache is warm here: canEditQuotation ran first and loads it.
+    if (nextStatus === "APPROVED" || nextApprovalStatus === "APPROVED") {
+        if (!rbac.can(rbac.rolesFromUser(req.user), FEATURE.SALES_QUOTATION, "approve")) {
+            return res.status(403).json({ error: "Access denied. Insufficient permission" });
+        }
     }
 
     const sql = `

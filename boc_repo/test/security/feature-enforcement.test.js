@@ -146,6 +146,71 @@ describe("grants union across a user's roles", () => {
     });
 });
 
+describe("approving a quotation needs the approve grant, not a role name", () => {
+    // PATCH /quotation/status/:id is one endpoint doing two jobs, so the
+    // approve check lives in the handler. It used to be
+    // role_name.indexOf("ADMIN") !== -1 -- a substring test, on the
+    // legacy single-role column only.
+    function withRoles(grants) {
+        const app = createFakeApp();
+        const pool = createFakePool({
+            responses: [{ match: /^UPDATE quotations/i, result: { affectedRows: 1 } }]
+        });
+        const rbac = createFakeRbac({ grants });
+        require("../../backend/sales_api")(Object.assign({ app, pool }, passThroughAuth(), { rbac }));
+        return app;
+    }
+
+    const EDIT_ONLY = { CLERK: { [FEATURE.SALES_QUOTATION]: ["view", "edit"] } };
+    const CAN_APPROVE = { LEAD: { [FEATURE.SALES_QUOTATION]: ["view", "edit", "approve"] } };
+
+    test("edit alone cannot approve", async () => {
+        const res = await withRoles(EDIT_ONLY).invoke("patch", "/quotation/status/:id", {
+            params: { id: "1" }, body: { status: "Approved" }, user: { user_id: 3, roles: ["CLERK"] }
+        });
+
+        assert.equal(res.statusCode, 403);
+    });
+
+    test("edit alone can still move a quotation to a non-approval status", async () => {
+        const res = await withRoles(EDIT_ONLY).invoke("patch", "/quotation/status/:id", {
+            params: { id: "1" }, body: { status: "Sent" }, user: { user_id: 3, roles: ["CLERK"] }
+        });
+
+        assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    });
+
+    test("the approve grant approves, without the role being called ADMIN", async () => {
+        const res = await withRoles(CAN_APPROVE).invoke("patch", "/quotation/status/:id", {
+            params: { id: "1" }, body: { status: "Approved" }, user: { user_id: 4, roles: ["LEAD"] }
+        });
+
+        assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    });
+
+    test("a role whose NAME merely contains ADMIN is not an approver", async () => {
+        const res = await withRoles({ NONADMIN: { [FEATURE.SALES_QUOTATION]: ["view", "edit"] } })
+            .invoke("patch", "/quotation/status/:id", {
+                params: { id: "1" }, body: { approval_status: "Approved" },
+                user: { user_id: 6, roles: ["NONADMIN"] }
+            });
+
+        assert.equal(res.statusCode, 403,
+            "\"NONADMIN\".indexOf(\"ADMIN\") !== -1 -- the substring test is back");
+    });
+
+    test("an approver identified only by the roles array is not refused", async () => {
+        // The old check read req.user.role_name and ignored roles[], so a
+        // token carrying roles: ["LEAD"] and no legacy column was denied.
+        const res = await withRoles(CAN_APPROVE).invoke("patch", "/quotation/status/:id", {
+            params: { id: "1" }, body: { status: "Approved" },
+            user: { user_id: 7, roles: ["LEAD"], role_name: undefined }
+        });
+
+        assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    });
+});
+
 describe("the gate runs before the handler", () => {
     test("a denied write never reaches the database", async () => {
         const { app, pool } = build({ grants: SALES_REP });

@@ -14,6 +14,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("SALES_QUOTATION");
+
+  applyRecordPermissions();
   quotationItemsTemplate = $("#quotationItemsTmpl").html();
 
   var params = new URLSearchParams(window.location.search);

@@ -12,6 +12,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("INV_GOODS_RECEIPT");
+
+  applyRecordPermissions();
   stockEntryItemsTemplate = $("#stockEntryItemsTmpl").html();
 
   var params = new URLSearchParams(window.location.search);

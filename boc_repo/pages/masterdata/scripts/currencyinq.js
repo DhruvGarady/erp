@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_CURRENCY");
   currencyTemplate = $("#listTmpl").html();
   currencies = [];
   $("#currencyTableSearch").on("input", filterCurrencyTable);
@@ -102,15 +103,21 @@ function filterCurrencyTable() {
 }
 
 function addCurrency() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "currency_add.html";
 }
 
 function editCurrency(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "currency_add.html?id=" + id;
 }
 
 function deleteCurrency(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this currency?", function () {

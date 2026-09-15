@@ -703,3 +703,55 @@ label {
 		flex-direction: column;
 	}
 }
+
+/* ==================================================================
+   FEATURE PERMISSIONS
+
+   setPageFeature() in global_exp1.js stamps can-<action> /
+   cannot-<action> onto <body> from the grants returned by
+   /feature/getFeature. Anything marked data-perm="<action>" then
+   disappears for users who lack it.
+
+   This is CSS rather than JS on purpose: the inquiry grids replace
+   their entire innerHTML on every search and every keystroke in the
+   table filter, so a JS sweep would need re-running after each render
+   and would eventually be missed. A body class outlives all of it.
+
+   Buttons hidden here are still fully enforced server-side by
+   requirePermission() -- this only removes controls the user cannot
+   use, it is not the access check.
+   ================================================================== */
+
+body.cannot-create [data-perm="create"],
+body.cannot-edit [data-perm="edit"],
+body.cannot-delete [data-perm="delete"],
+body.cannot-approve [data-perm="approve"],
+body.cannot-print [data-perm="print"] {
+	display: none !important;
+}
+
+/* Grid action cells keep their width when emptied, so columns stay
+   aligned across rows where some actions are permitted and others
+   are not. */
+body [data-perm-cell] {
+	min-width: 32px;
+}
+
+/* Read-only record screen: the user may view this record but not save
+   it. applyRecordPermissions() sets the class. pointer-events rather
+   than the disabled attribute, because the _add pages populate their
+   fields asynchronously and would re-render past a disabled flag. */
+body.perm-readonly [data-perm-save] {
+	display: none !important;
+}
+
+body.perm-readonly .mainDiv input,
+body.perm-readonly .mainDiv select,
+body.perm-readonly .mainDiv textarea,
+body.perm-readonly .mainDiv .search,
+body.perm-readonly .mainDiv .actionButton,
+body.perm-readonly .mainDiv .deleteBtn {
+	pointer-events: none;
+	background: #f0f0f0;
+	color: #6c757d;
+}

@@ -13,12 +13,13 @@
 //
 // Usage:
 //   const app = createFakeApp();
-//   require("../../backend/masterdata_api")({ app, pool, verifyToken, requireRole });
+//   require("../../backend/masterdata_api")(Object.assign({ app, pool }, passThroughAuth()));
 //   const res = await app.invoke("get", "/api/v1/:table", { params: { table: "mst_uom" } });
 //   assert.equal(res.statusCode, 200);
 // ==================================================================
 
 const assert = require("node:assert");
+const { createFakeRbac } = require("./fake-rbac");
 
 const METHODS = ["get", "post", "put", "patch", "delete", "options", "head", "all"];
 
@@ -270,6 +271,12 @@ function createFakeApp() {
 
 // A verifyToken/requireRole pair that waves everything through, for tests
 // where auth is not the thing under test.
+// The permissive default. Routes are gated by rbac.requirePermission now,
+// so every module needs an `rbac` to register at all -- a test that is not
+// about permissions gets one that says yes to everything. Tests that ARE
+// about permissions pass their own:
+//
+//   Object.assign(passThroughAuth(), { rbac: createFakeRbac({ grants: {...} }) })
 function passThroughAuth(user) {
     return {
         // Leaves a req.user supplied by the test alone, so invoke(..., { user })
@@ -283,7 +290,8 @@ function passThroughAuth(user) {
         },
         userHasRole() {
             return true;
-        }
+        },
+        rbac: createFakeRbac()
     };
 }
 

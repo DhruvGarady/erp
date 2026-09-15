@@ -45,15 +45,19 @@ function createAuthTools(options) {
         return String(roleName || "").trim().toUpperCase();
     }
 
-    // KNOWN BROKEN - do not copy this pattern.
-    // The `userRole.indexOf(role) !== -1` arm is a substring match, so a
-    // user whose role_name merely CONTAINS an allowed role passes the
-    // check: "SALES_ADMIN" and "NONADMIN" both satisfy requireRole(["ADMIN"]).
-    // Locked in by test/security/role-substring-match.test.js, which carries
-    // the one-line fix as a todo test. Behaviour left as-is on purpose.
+    // Exact match only.
+    //
+    // This used to be `userRole === role || userRole.indexOf(role) !== -1`.
+    // The second arm asked whether the REQUIRED role was a substring of the
+    // USER's role, so every one of these satisfied requireRole(["ADMIN"]):
+    // NONADMIN, NOT_ADMIN, READONLY_ADMIN, SALES_ADMIN. Role names are free
+    // text created through the admin UI, so naming a role "READONLY_ADMIN"
+    // to restrict someone silently granted them full administrator instead.
+    //
+    // Reads the roles array when the token has one (multi-role), falling
+    // back to the legacy single role_name claim for tokens issued before it.
     function userHasRole(req, allowedRoles) {
-        const userRole = normalizeRoleName(req.user && req.user.role_name);
-        const roles = (allowedRoles || []).map(normalizeRoleName);
+        const roles = (allowedRoles || []).map(normalizeRoleName).filter(Boolean);
 
         if (!roles.length) {
             return true;
@@ -63,7 +67,12 @@ function createAuthTools(options) {
             return true;
         }
 
-        return roles.some((role) => userRole === role || userRole.indexOf(role) !== -1);
+        const user = req.user || {};
+        const held = (Array.isArray(user.roles) && user.roles.length ? user.roles : [user.role_name])
+            .map(normalizeRoleName)
+            .filter(Boolean);
+
+        return held.some(userRole => roles.includes(userRole));
     }
 
     function requireRole(allowedRoles) {

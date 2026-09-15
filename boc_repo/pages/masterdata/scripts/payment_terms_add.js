@@ -5,6 +5,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_PAYMENT_TERMS");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editPaymentTermId = params.get("id");
 

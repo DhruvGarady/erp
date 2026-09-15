@@ -132,7 +132,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Material" onclick="addMaterial()" class="search">
+                <input type="button" value="Add Material" onclick="addMaterial()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new material</div>
               </div>
             </td>
@@ -160,8 +160,8 @@
                 <th width="8%">Rate</th>
                 <th width="8%">Reorder</th>
                 <th width="7%">Status</th>
-                <th width="3%">Edit</th>
-                <th width="3%" style="text-align:center;">Del</th>
+                <th data-perm="edit" width="3%">Edit</th>
+                <th data-perm="delete" width="3%" style="text-align:center;">Del</th>
               </tr>
 
               <%_.each(materials, function(item){ %>
@@ -175,10 +175,10 @@
                   <td><%= item.standard_rate || '' %></td>
                   <td><%= item.reorder_level || '' %></td>
                   <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editMaterial(<%= item.material_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editMaterial(<%= item.material_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit Material</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteMaterial(<%= item.material_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deleteMaterial(<%= item.material_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

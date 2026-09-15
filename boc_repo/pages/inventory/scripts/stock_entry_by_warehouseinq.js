@@ -7,6 +7,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("INV_GOODS_RECEIPT");
   goodsReceiptTemplate = $("#listTmpl").html();
   $("#stockEntryTableSearch").on("input", filterStockEntryTable);
 
@@ -172,6 +173,8 @@ function warehouseName(warehouseId) {
 }
 
 function addStockEntry() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "stock_entry_by_warehouse_add.html";
 }
 

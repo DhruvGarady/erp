@@ -16,6 +16,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("SALES_ORDER");
+
+  applyRecordPermissions();
   salesOrderItemsTemplate = $("#salesOrderItemsTmpl").html();
 
   var params = new URLSearchParams(window.location.search);

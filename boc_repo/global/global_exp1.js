@@ -127,6 +127,11 @@ function loadLoginFeatures() {
 				return;
 			}
 
+			// Store the flat permission map BEFORE buildFeatureTree runs --
+			// it lowercases names and nests children, and the menu only
+			// needs can_view. The other actions drive button visibility.
+			storeFeaturePermissions(features);
+
 			parentFeatures = buildFeatureTree(features);
 			sessionStorage.setItem("FEATURES", JSON.stringify(parentFeatures));
 			location.href = "pages/home.html";
@@ -139,6 +144,184 @@ function loadLoginFeatures() {
 			showWarningDialog(message);
 		}
 	});
+}
+
+// ==================================================================
+// FEATURE PERMISSIONS
+//
+// /feature/getFeature returns only the features the user's roles may
+// view, each carrying its effective grants:
+//
+//     { feature_code: "MST_UOM", permissions: { view:true, create:false,
+//       edit:true, delete:false, approve:false, print:true }, ... }
+//
+// Those are cached flat in sessionStorage.FEATURE_PERMISSIONS so any
+// page can ask "may this user create here?" without another request.
+//
+// This is presentation only. Hiding a button stops an honest mistake,
+// not an attacker -- the same check runs server-side in
+// requirePermission() on every route, and that is what actually
+// enforces access.
+// ==================================================================
+
+var PERMISSION_ACTIONS = ["view", "create", "edit", "delete", "approve", "print"];
+var currentPageFeature = "";
+var recordPermissionMode = null;
+
+function storeFeaturePermissions(features) {
+	var map = {};
+
+	_.each(features || [], function(item) {
+		if (!item || !item.feature_code) {
+			return;
+		}
+
+		var granted = item.permissions || {};
+		var entry = {};
+
+		_.each(PERMISSION_ACTIONS, function(action) {
+			entry[action] = granted[action] === true;
+		});
+
+		map[item.feature_code] = entry;
+	});
+
+	sessionStorage.setItem("FEATURE_PERMISSIONS", JSON.stringify(map));
+	return map;
+}
+
+// {} is returned both when the grants have not been fetched yet and when
+// they were fetched and grant nothing. Callers that would act on a denial
+// need to tell those apart -- ask this first.
+function featurePermissionsKnown() {
+	return sessionStorage.getItem("FEATURE_PERMISSIONS") !== null;
+}
+
+function getFeaturePermissions() {
+	var raw = sessionStorage.getItem("FEATURE_PERMISSIONS");
+
+	if (!raw) {
+		return {};
+	}
+
+	try {
+		return JSON.parse(raw) || {};
+	} catch (e) {
+		return {};
+	}
+}
+
+// canDo("MST_UOM", "create") -- explicit feature.
+// canDo("create")            -- the feature this page declared.
+function canDo(featureCode, action) {
+	if (action === undefined) {
+		action = featureCode;
+		featureCode = currentPageFeature;
+	}
+
+	if (!featureCode || !action) {
+		return false;
+	}
+
+	var permissions = getFeaturePermissions();
+
+	if (!Object.prototype.hasOwnProperty.call(permissions, featureCode)) {
+		return false;
+	}
+
+	return permissions[featureCode][action] === true;
+}
+
+// Declare which feature a page belongs to. Stamps the granted actions
+// onto <body> as classes, so CSS hides what the user cannot do:
+//
+//     <button data-perm="create">Add</button>
+//
+// Driving it from CSS rather than JS matters because the inquiry grids
+// re-render their whole innerHTML on every search and every filter
+// keystroke. A JS sweep would have to be re-run after each one and
+// would eventually be forgotten; a body class survives all of it.
+function setPageFeature(featureCode) {
+	currentPageFeature = featureCode || "";
+
+	var body = $("body");
+
+	_.each(PERMISSION_ACTIONS, function(action) {
+		body.removeClass("can-" + action).removeClass("cannot-" + action);
+		body.addClass((canDo(currentPageFeature, action) ? "can-" : "cannot-") + action);
+	});
+
+	body.addClass("perm-ready");
+	return currentPageFeature;
+}
+
+function getPageFeature() {
+	return currentPageFeature;
+}
+
+// Guard for the handlers themselves. Buttons are hidden by CSS, but a
+// row action can still be reached from the console or a stale DOM, and
+// a clear dialog beats a raw 403 from the server.
+function ensurePermission(action, message) {
+	if (canDo(currentPageFeature, action)) {
+		return true;
+	}
+
+	showWarningDialog(message || "You do not have permission to perform this action.");
+	return false;
+}
+
+// For the _add pages, which double as edit screens. Save means "create"
+// on a new record and "edit" on an existing one, so CSS alone cannot
+// decide -- it depends on whether ?id= was present.
+//
+// Without the right grant the screen becomes read-only rather than
+// refusing outright: a user who may view but not edit should still be
+// able to open a record and read it.
+// Call with no argument: ?id= decides whether this is a create or an
+// edit. Marks the whole screen read-only through a body class rather
+// than walking the DOM, because these pages populate their fields
+// asynchronously -- lookups, then the record -- so anything disabled up
+// front would be re-rendered moments later.
+function applyRecordPermissions(isEdit) {
+	if (isEdit === undefined) {
+		isEdit = Boolean(new URLSearchParams(window.location.search).get("id"));
+	}
+
+	// Remembered so refreshFeaturePermissions can redo this decision.
+	// Left null on an _inq screen, which never calls this -- Save has no
+	// meaning there and a read-only pass would grey out the filters.
+	recordPermissionMode = isEdit;
+
+	// Grants still in flight. An absent map reads as a denial, so
+	// deciding now would make the screen read-only and fire the warning
+	// dialog; correcting it a moment later does not take the dialog
+	// back. Wait to be called again once the grants land.
+	if (!featurePermissionsKnown()) {
+		return true;
+	}
+
+	if (canDo(currentPageFeature, isEdit ? "edit" : "create")) {
+		$("body").removeClass("perm-readonly");
+		return true;
+	}
+
+	$("body").addClass("perm-readonly");
+
+	// Runs after the page's own ready handler has finished setting the
+	// title, so this wording is not immediately overwritten.
+	_.defer(function() {
+		var title = $("#pageTitle");
+		title.text(title.text().replace(/^\s*(Add|Edit)/, "View"));
+
+		if (!isEdit) {
+			// A blank create form has nothing to read -- say so plainly
+			// rather than presenting an inert screen.
+			showWarningDialog("You do not have permission to create records here.");
+		}
+	});
+
+	return false;
 }
 
 function buildFeatureTree(features) {
@@ -308,8 +491,66 @@ function buildMenu(){
 	applyStoredMenuCollapseState();
 	setupFeatureSearch();
 
-	//console.log(JSON.stringify(parentFeatures));
-	
+	// Sessions that predate the permission model have a menu tree but no
+	// grants cached. Refetch once rather than treating an absent map as
+	// "denied", which would blank every button on the page.
+	if (!sessionStorage.getItem("FEATURE_PERMISSIONS")) {
+		refreshFeaturePermissions();
+	}
+}
+
+// Re-pulls features and grants from the server. Called when the cached
+// grants are missing, and available to the admin screens to call after
+// editing role_features so the change takes effect without a re-login.
+function refreshFeaturePermissions(onDone) {
+	$.ajax({
+		type: "GET",
+		url: request_url + "/feature/getFeature",
+		headers: getAuthHeaders(),
+		contentType: "application/json",
+		success: function(features) {
+			if (!Array.isArray(features)) {
+				if (onDone) onDone(false);
+				return;
+			}
+
+			storeFeaturePermissions(features);
+			sessionStorage.setItem("FEATURES", JSON.stringify(buildFeatureTree(features)));
+
+			// The sidebar is built from this same list, so rebuild it too.
+			// Storing the tree without re-rendering leaves a revoked feature
+			// sitting in the menu until the next login -- which defeats the
+			// point of offering a refresh at all. setupFeatureSearch destroys
+			// its old autocomplete first, so calling it again is safe.
+			renderFeatureMenu(getStoredFeatureTree());
+			applyStoredMenuCollapseState();
+			setupFeatureSearch();
+
+			// Re-stamp the body classes now that the grants are known.
+			if (currentPageFeature) {
+				setPageFeature(currentPageFeature);
+			}
+
+			// And redo the Save decision, which setPageFeature does not
+			// cover: it depends on ?id=, not on a body class.
+			if (recordPermissionMode !== null) {
+				applyRecordPermissions(recordPermissionMode);
+			}
+
+			if (onDone) onDone(true);
+		},
+		error: function(xhr) {
+			if (xhr && xhr.status === 401) {
+				showWarningDialog("Session expired. Please login again.");
+				setTimeout(function () {
+					location.href = "../../index.html";
+				}, 500);
+				return;
+			}
+
+			if (onDone) onDone(false);
+		}
+	});
 }
 
 function applyStoredMenuCollapseState() {

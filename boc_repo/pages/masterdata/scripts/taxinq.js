@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_TAX");
   taxTemplate = $("#listTmpl").html();
   taxes = [];
   $("#taxTableSearch").on("input", filterTaxTable);
@@ -102,15 +103,21 @@ function filterTaxTable() {
 }
 
 function addTax() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "tax_add.html";
 }
 
 function editTax(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "tax_add.html?id=" + id;
 }
 
 function deleteTax(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this tax?", function () {

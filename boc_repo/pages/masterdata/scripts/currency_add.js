@@ -5,6 +5,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_CURRENCY");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editCurrencyId = params.get("id");
 

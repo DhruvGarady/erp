@@ -1,9 +1,14 @@
 // Security regression tests for requireRole (backend/auth.js).
-// House rule in this codebase: reads are open to any authenticated user,
-// writes are role-gated. These lock in the write gate.
 //
-// The substring-matching defect in userHasRole has its own file:
-// test/security/role-substring-match.test.js.
+// No route calls requireRole any more -- every one is gated on a feature
+// grant instead (see feature-enforcement.test.js). It stays exported and
+// tested because role-shaped checks are still a legitimate thing to want,
+// and because the substring-matching defect it used to have is worth
+// keeping a guard on: test/security/role-substring-match.test.js.
+//
+// Note the old house rule these tests were written under -- "reads are
+// open to any authenticated user, writes are role-gated" -- no longer
+// holds. Reads are gated on can_view like everything else.
 
 const { describe, test } = require("node:test");
 const assert = require("node:assert");

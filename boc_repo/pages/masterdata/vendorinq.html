@@ -124,7 +124,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Vendor" onclick="addVendor()" class="search">
+                <input type="button" value="Add Vendor" onclick="addVendor()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new vendor</div>
               </div>
             </td>
@@ -153,8 +153,8 @@
                 <th width="8%">City</th>
                 <th width="8%">State</th>
                 <th width="6%">Status</th>
-                <th width="3%">Edit</th>
-                <th width="3%" style="text-align:center;">Del</th>
+                <th data-perm="edit" width="3%">Edit</th>
+                <th data-perm="delete" width="3%" style="text-align:center;">Del</th>
               </tr>
 
               <%_.each(vendors, function(item){ %>
@@ -169,10 +169,10 @@
                   <td><%= item.city || '' %></td>
                   <td><%= item.state || '' %></td>
                   <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editVendor(<%= item.vendor_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editVendor(<%= item.vendor_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit Vendor</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deleteVendor(<%= item.vendor_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deleteVendor(<%= item.vendor_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

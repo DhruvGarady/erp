@@ -14,6 +14,7 @@ const registerGlobalApi = require("../../backend/global_api");
 const { createFakePool } = require("../helpers/fake-pool");
 const { createFakeApp, passThroughAuth } = require("../helpers/fake-app");
 const { TEST_SECRET } = require("../helpers/auth-fixtures");
+const { createFakeRbac } = require("../helpers/fake-rbac");
 
 const LOGIN_SELECT = /FROM boc_user WHERE LOWER\(username\)/i;
 const PASSWORD = "correct horse battery staple";
@@ -39,7 +40,7 @@ after(() => {
 function registerWithStoredUser(row) {
     pool = createFakePool({ responses: [{ match: LOGIN_SELECT, rows: row ? [row] : [] }] });
     app = createFakeApp();
-    registerGlobalApi(Object.assign({ app, pool }, passThroughAuth()));
+    registerGlobalApi(Object.assign({ app, pool, rbac: createFakeRbac({ userRoles: { 3: ["ADMIN"] } }) }, passThroughAuth()));
 }
 
 function login(username, password) {

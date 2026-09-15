@@ -737,3 +737,59 @@ CREATE TABLE inventory_summary (
     updated_at DATETIME,
     is_active VARCHAR(20)
 );
+
+-- ===============================================================
+-- PURCHASE INDENT
+-- First step of the purchase cycle. An internal requisition: a
+-- department asks for materials, no vendor and no firm price yet.
+-- Created by boc-db/migrations/003_purchase_indent.sql.
+-- ===============================================================
+CREATE TABLE purchase_indents (
+    purchase_indent_id INT AUTO_INCREMENT PRIMARY KEY,
+    indent_no VARCHAR(30) NOT NULL,
+    indent_date DATE NOT NULL,
+    required_by_date DATE,
+    department VARCHAR(100),
+    requested_by_id INT,
+    requested_by_name VARCHAR(150),
+    warehouse_id INT,
+    warehouse_name VARCHAR(150),
+    priority VARCHAR(20),
+    purpose VARCHAR(255),
+    reference_no VARCHAR(100),
+    remarks TEXT,
+    status VARCHAR(50),
+    approval_status VARCHAR(50),
+    submitted_by INT,
+    submitted_at DATETIME,
+    approved_by INT,
+    approved_by_name VARCHAR(150),
+    approved_at DATETIME,
+    approval_remarks VARCHAR(255),
+    estimated_total DECIMAL(12,2),
+    created_by VARCHAR(50),
+    updated_by VARCHAR(50),
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);
+
+CREATE TABLE purchase_indent_items (
+    purchase_indent_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    purchase_indent_id INT NOT NULL,
+    line_no INT,
+    material_id INT,
+    material_code VARCHAR(50),
+    item_name VARCHAR(255) NOT NULL,
+    item_description TEXT,
+    uom_id INT,
+    unit VARCHAR(50),
+    qty DECIMAL(12,2),
+    required_by_date DATE,
+    estimated_rate DECIMAL(12,2),
+    estimated_value DECIMAL(12,2),
+    remarks VARCHAR(255),
+    created_at DATETIME,
+    updated_at DATETIME,
+    is_active VARCHAR(20)
+);

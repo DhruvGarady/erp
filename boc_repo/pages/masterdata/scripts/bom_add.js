@@ -11,6 +11,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_BOM");
+
+  applyRecordPermissions();
   bomItemsTemplate = $("#bomItemsTmpl").html();
 
   var params = new URLSearchParams(window.location.search);

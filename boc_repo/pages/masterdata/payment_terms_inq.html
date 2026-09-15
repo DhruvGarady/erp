@@ -123,7 +123,7 @@
 
             <td width="20px" style="vertical-align:middle;text-align:right;">
               <div class="tooltip-wrapper">
-                <input type="button" value="Add Terms" onclick="addPaymentTerms()" class="search">
+                <input type="button" value="Add Terms" onclick="addPaymentTerms()" data-perm="create" class="search">
                 <div class="tooltip-text">Add new payment terms</div>
               </div>
             </td>
@@ -147,8 +147,8 @@
                 <th width="10%">Days</th>
                 <th width="43%">Description</th>
                 <th width="7%">Status</th>
-                <th width="3%">Edit</th>
-                <th width="3%" style="text-align:center;">Del</th>
+                <th data-perm="edit" width="3%">Edit</th>
+                <th data-perm="delete" width="3%" style="text-align:center;">Del</th>
               </tr>
 
               <%_.each(paymentTerms, function(item){ %>
@@ -158,10 +158,10 @@
                   <td><%= item.no_of_days || '' %></td>
                   <td><%= item.description || '' %></td>
                   <td><%= item.is_active === 'N' ? 'Inactive' : 'Active' %></td>
-                  <td onclick="editPaymentTerms(<%= item.payment_term_id %>)">
+                  <td data-perm="edit" data-perm-cell onclick="editPaymentTerms(<%= item.payment_term_id %>)">
                     <div class="tooltip-wrapper"><i class="material-icons">edit</i><div class="tooltip-text">Edit Payment Terms</div></div>
                   </td>
-                  <td style="text-align:center;" onclick="deletePaymentTerms(<%= item.payment_term_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
+                  <td data-perm="delete" data-perm-cell style="text-align:center;" onclick="deletePaymentTerms(<%= item.payment_term_id %>)"><i class="material-icons" style="color: red;">delete_forever</i></td>
                 </tr>
               <% }); %>
             </table>

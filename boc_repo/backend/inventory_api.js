@@ -4,10 +4,12 @@ const {
     getNextDocumentNumber
 } = require("./helpers");
 
-module.exports = function registerInventoryApi({ app, pool, verifyToken, requireRole }) {
+const { FEATURE } = require("./rbac");
+
+module.exports = function registerInventoryApi({ app, pool, verifyToken, rbac }) {
 //----------------------------------------------------INVENTORY / STOCK MODULE------------------------------------------------
 
-const INVENTORY_WRITE_ROLES = ["ADMIN", "MANAGER", "INVENTORY"];
+const { requirePermission } = rbac;
 
 const DOCUMENT_SEQUENCE_TABLE_SQL = `
     CREATE TABLE IF NOT EXISTS document_sequences (
@@ -73,8 +75,8 @@ function makeRowFromColumns(source, columns, defaults = {}) {
     return row;
 }
 
-function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchable = [], label }) {
-    app.get(`${routeBase}/list`, verifyToken, (req, res) => {
+function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchable = [], label, feature }) {
+    app.get(`${routeBase}/list`, verifyToken, requirePermission(feature, "view"), (req, res) => {
         const values = [];
         const whereParts = [];
         const limit = clampListLimit(req.query.limit);
@@ -105,7 +107,7 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
         });
     });
 
-    app.get(`${routeBase}/:id`, verifyToken, (req, res) => {
+    app.get(`${routeBase}/:id`, verifyToken, requirePermission(feature, "view"), (req, res) => {
         const sql = `SELECT * FROM ${tableName} WHERE ${pk} = ? LIMIT 1`;
         pool.query(sql, [req.params.id], (err, rows) => {
             if (err) {
@@ -119,7 +121,7 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
         });
     });
 
-    app.post(`${routeBase}/create`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
+    app.post(`${routeBase}/create`, verifyToken, requirePermission(feature, "create"), (req, res) => {
         const dateNow = now();
         const source = req.body || {};
         const insertColumns = columns.filter(col => col !== pk);
@@ -142,7 +144,7 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
         });
     });
 
-    app.put(`${routeBase}/update/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
+    app.put(`${routeBase}/update/:id`, verifyToken, requirePermission(feature, "edit"), (req, res) => {
         const dateNow = now();
         const source = req.body || {};
         const updateColumns = columns.filter(col => ![pk, "created_by", "created_at"].includes(col));
@@ -166,7 +168,7 @@ function registerSimpleTableRoutes({ routeBase, tableName, pk, columns, searchab
         });
     });
 
-    app.delete(`${routeBase}/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
+    app.delete(`${routeBase}/:id`, verifyToken, requirePermission(feature, "delete"), (req, res) => {
         const dateNow = now();
         const updatedBy = (req.body && req.body.updated_by) || (req.user && req.user.user_id) || null;
         const sql = `UPDATE ${tableName} SET is_active = 'N', updated_at = ?${columns.includes("updated_by") ? ", updated_by = ?" : ""} WHERE ${pk} = ?`;
@@ -353,6 +355,7 @@ const STOCK_TRANSFER_ITEM_COLUMNS = [
 
 registerSimpleTableRoutes({
     routeBase: "/stockledger",
+    feature: FEATURE.INV_LEDGER,
     tableName: "stock_ledger",
     pk: "ledger_id",
     columns: STOCK_LEDGER_COLUMNS,
@@ -362,6 +365,7 @@ registerSimpleTableRoutes({
 
 registerSimpleTableRoutes({
     routeBase: "/stockreservation",
+    feature: FEATURE.INV_RESERVATION,
     tableName: "stock_reservation",
     pk: "reservation_id",
     columns: STOCK_RESERVATION_COLUMNS,
@@ -371,6 +375,7 @@ registerSimpleTableRoutes({
 
 registerSimpleTableRoutes({
     routeBase: "/inventorysummary",
+    feature: FEATURE.INV_SUMMARY,
     tableName: "inventory_summary",
     pk: "inventory_summary_id",
     columns: INVENTORY_SUMMARY_COLUMNS,
@@ -380,6 +385,7 @@ registerSimpleTableRoutes({
 
 registerSimpleTableRoutes({
     routeBase: "/deliveryitems",
+    feature: FEATURE.INV_DELIVERY,
     tableName: "delivery_items",
     pk: "delivery_item_id",
     columns: DELIVERY_ITEM_COLUMNS,
@@ -389,6 +395,7 @@ registerSimpleTableRoutes({
 
 registerSimpleTableRoutes({
     routeBase: "/goodsreceiptitems",
+    feature: FEATURE.INV_GOODS_RECEIPT,
     tableName: "goods_receipt_items",
     pk: "goods_receipt_item_id",
     columns: GOODS_RECEIPT_ITEM_COLUMNS,
@@ -398,6 +405,7 @@ registerSimpleTableRoutes({
 
 registerSimpleTableRoutes({
     routeBase: "/stocktransferitems",
+    feature: FEATURE.INV_TRANSFER,
     tableName: "stock_transfer_items",
     pk: "stock_transfer_item_id",
     columns: STOCK_TRANSFER_ITEM_COLUMNS,
@@ -447,10 +455,11 @@ function registerInventoryDocumentRoutes(config) {
         headerDefaults,
         itemDefaults,
         listColumns,
-        afterCreate
+        afterCreate,
+        feature
     } = config;
 
-    app.get(`${routeBase}/list`, verifyToken, (req, res) => {
+    app.get(`${routeBase}/list`, verifyToken, requirePermission(feature, "view"), (req, res) => {
         const values = [];
         const whereParts = ["is_active = 'Y'"];
         const limit = clampListLimit(req.query.limit);
@@ -498,7 +507,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.get(`${routeBase}/nextno`, verifyToken, (req, res) => {
+    app.get(`${routeBase}/nextno`, verifyToken, requirePermission(feature, "view"), (req, res) => {
         peekNextDocumentNumber(`${numberPrefix}_${String(label || "").replace(/\s+/g, "_").toUpperCase()}`, numberPrefix, headerTable, numberColumn, headerPk, (err, nextNo) => {
             if (err) {
                 console.error(`GET ${routeBase}/nextno error:`, err);
@@ -509,7 +518,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.get(`${routeBase}/:id`, verifyToken, (req, res) => {
+    app.get(`${routeBase}/:id`, verifyToken, requirePermission(feature, "view"), (req, res) => {
         const headerSql = `SELECT * FROM ${headerTable} WHERE ${headerPk} = ? LIMIT 1`;
         const itemSql = `SELECT * FROM ${itemTable} WHERE ${itemFk} = ? AND is_active = 'Y' ORDER BY ${itemPk} ASC`;
 
@@ -532,7 +541,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.post(`${routeBase}/create`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
+    app.post(`${routeBase}/create`, verifyToken, requirePermission(feature, "create"), (req, res) => {
         const dateNow = now();
         const header = req.body.header || {};
         const items = req.body.items || [];
@@ -642,7 +651,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.put(`${routeBase}/update/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
+    app.put(`${routeBase}/update/:id`, verifyToken, requirePermission(feature, "edit"), (req, res) => {
         const dateNow = now();
         const header = req.body.header || {};
         const items = req.body.items || [];
@@ -720,7 +729,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.patch(`${routeBase}/status/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
+    app.patch(`${routeBase}/status/:id`, verifyToken, requirePermission(feature, "edit"), (req, res) => {
         const dateNow = now();
         const updatedBy = req.body.updated_by || (req.user && req.user.user_id) || null;
         const sql = `UPDATE ${headerTable} SET status = ?, updated_by = ?, updated_at = ? WHERE ${headerPk} = ?`;
@@ -737,7 +746,7 @@ function registerInventoryDocumentRoutes(config) {
         });
     });
 
-    app.delete(`${routeBase}/:id`, verifyToken, requireRole(INVENTORY_WRITE_ROLES), (req, res) => {
+    app.delete(`${routeBase}/:id`, verifyToken, requirePermission(feature, "delete"), (req, res) => {
         const dateNow = now();
         const updatedBy = (req.body && req.body.updated_by) || (req.user && req.user.user_id) || null;
 
@@ -962,6 +971,7 @@ function updateGoodsReceiptInventorySummary(connection, summaryRows, dateNow, do
 
 registerInventoryDocumentRoutes({
     routeBase: "/delivery",
+    feature: FEATURE.INV_DELIVERY,
     label: "delivery",
     headerTable: "deliveries",
     itemTable: "delivery_items",
@@ -980,6 +990,7 @@ registerInventoryDocumentRoutes({
 
 registerInventoryDocumentRoutes({
     routeBase: "/goodsreceipt",
+    feature: FEATURE.INV_GOODS_RECEIPT,
     label: "goods receipt",
     headerTable: "goods_receipts",
     itemTable: "goods_receipt_items",
@@ -999,6 +1010,7 @@ registerInventoryDocumentRoutes({
 
 registerInventoryDocumentRoutes({
     routeBase: "/stocktransfer",
+    feature: FEATURE.INV_TRANSFER,
     label: "stock transfer",
     headerTable: "stock_transfers",
     itemTable: "stock_transfer_items",

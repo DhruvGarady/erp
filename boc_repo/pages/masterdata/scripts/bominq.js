@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_BOM");
   bomTemplate = $("#listTmpl").html();
   boms = [];
   $("#bomTableSearch").on("input", filterBomTable);
@@ -102,15 +103,21 @@ function filterBomTable() {
 }
 
 function addBom() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "bom_add.html";
 }
 
 function editBom(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "bom_add.html?id=" + id;
 }
 
 function deleteBom(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this BOM?", function () {

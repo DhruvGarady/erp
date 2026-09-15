@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_CUSTOMER");
   customerTemplate = $("#listTmpl").html();
   customers = [];
   $("#customerTableSearch").on("input", filterCustomerTable);
@@ -102,15 +103,21 @@ function filterCustomerTable() {
 }
 
 function addCustomer() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "customer_add.html";
 }
 
 function editCustomer(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "customer_add.html?id=" + id;
 }
 
 function deleteCustomer(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this customer?", function () {

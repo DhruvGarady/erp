@@ -5,6 +5,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_TAX");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editTaxId = params.get("id");
 

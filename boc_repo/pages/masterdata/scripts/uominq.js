@@ -6,6 +6,7 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_UOM");
   uomTemplate = $("#listTmpl").html();
   uoms = [];
   $("#uomTableSearch").on("input", filterUomTable);
@@ -102,15 +103,21 @@ function filterUomTable() {
 }
 
 function addUom() {
+  if (!ensurePermission("create", "You do not have permission to add records here.")) return;
+
   location.href = "uom_add.html";
 }
 
 function editUom(id) {
+  if (!ensurePermission("edit", "You do not have permission to edit records here.")) return;
+
   if (!id) return;
   location.href = "uom_add.html?id=" + id;
 }
 
 function deleteUom(id) {
+  if (!ensurePermission("delete", "You do not have permission to delete records here.")) return;
+
   if (!id) return;
 
   showConfirmDialog("Are you sure you want to deactivate this UOM?", function () {

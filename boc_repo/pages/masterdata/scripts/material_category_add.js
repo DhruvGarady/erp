@@ -5,6 +5,9 @@ $(document).ready(function () {
   buildMenu();
   setUsrName();
 
+  setPageFeature("MST_MATERIAL_GROUP");
+
+  applyRecordPermissions();
   var params = new URLSearchParams(window.location.search);
   editCategoryId = params.get("id");
 

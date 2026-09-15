@@ -166,6 +166,7 @@ function loadLoginFeatures() {
 
 var PERMISSION_ACTIONS = ["view", "create", "edit", "delete", "approve", "print"];
 var currentPageFeature = "";
+var recordPermissionMode = null;
 
 function storeFeaturePermissions(features) {
 	var map = {};
@@ -187,6 +188,13 @@ function storeFeaturePermissions(features) {
 
 	sessionStorage.setItem("FEATURE_PERMISSIONS", JSON.stringify(map));
 	return map;
+}
+
+// {} is returned both when the grants have not been fetched yet and when
+// they were fetched and grant nothing. Callers that would act on a denial
+// need to tell those apart -- ask this first.
+function featurePermissionsKnown() {
+	return sessionStorage.getItem("FEATURE_PERMISSIONS") !== null;
 }
 
 function getFeaturePermissions() {
@@ -278,6 +286,19 @@ function ensurePermission(action, message) {
 function applyRecordPermissions(isEdit) {
 	if (isEdit === undefined) {
 		isEdit = Boolean(new URLSearchParams(window.location.search).get("id"));
+	}
+
+	// Remembered so refreshFeaturePermissions can redo this decision.
+	// Left null on an _inq screen, which never calls this -- Save has no
+	// meaning there and a read-only pass would grey out the filters.
+	recordPermissionMode = isEdit;
+
+	// Grants still in flight. An absent map reads as a denial, so
+	// deciding now would make the screen read-only and fire the warning
+	// dialog; correcting it a moment later does not take the dialog
+	// back. Wait to be called again once the grants land.
+	if (!featurePermissionsKnown()) {
+		return true;
 	}
 
 	if (canDo(currentPageFeature, isEdit ? "edit" : "create")) {
@@ -496,9 +517,24 @@ function refreshFeaturePermissions(onDone) {
 			storeFeaturePermissions(features);
 			sessionStorage.setItem("FEATURES", JSON.stringify(buildFeatureTree(features)));
 
+			// The sidebar is built from this same list, so rebuild it too.
+			// Storing the tree without re-rendering leaves a revoked feature
+			// sitting in the menu until the next login -- which defeats the
+			// point of offering a refresh at all. setupFeatureSearch destroys
+			// its old autocomplete first, so calling it again is safe.
+			renderFeatureMenu(getStoredFeatureTree());
+			applyStoredMenuCollapseState();
+			setupFeatureSearch();
+
 			// Re-stamp the body classes now that the grants are known.
 			if (currentPageFeature) {
 				setPageFeature(currentPageFeature);
+			}
+
+			// And redo the Save decision, which setPageFeature does not
+			// cover: it depends on ?id=, not on a body class.
+			if (recordPermissionMode !== null) {
+				applyRecordPermissions(recordPermissionMode);
 			}
 
 			if (onDone) onDone(true);
